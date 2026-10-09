@@ -1,0 +1,9 @@
+{
+  "cx": 480,
+  "horizon": 140,
+  "ground": 400,
+  "base": 120,
+  "zNear": 1,
+  "zFar": 2,
+  "thickness": 16
+}

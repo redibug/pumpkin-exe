@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
-import { COLS, ROWS, project, tileCorners, tileFeet, tileCenter, isPlayerTile } from '../systems/grid.js';
+import { COLS, ROWS, project, tileCorners, tileFeet, tileCenter, isPlayerTile, gridParams, setGridParams, getGridParams } from '../systems/grid.js';
 import { CHIPS, BOSS } from '../systems/chips.js';
 import { RUTABAGA_MANDRAKE } from '../systems/viruses.js';
 import { fitFactor } from '../systems/spriteFit.js';
+import { createDebugOverlay } from '../systems/debugOverlay.js';
 
 // BattleScene — written during the jam 72h window (2026-10-09).
 // MMBN-style grid battle: Bugchan (navi) vs PUMPKIN.EXE + RUTABAGA.MND.
@@ -98,6 +99,22 @@ export default class BattleScene extends Phaser.Scene {
     this.placeFighter(this.mandrakeSprite, this.mandrake.pos.col, this.mandrake.pos.row, MANDRAKE_MANUAL);
     this.mandrake.timer = this.time.now + M.burrowedMs;
 
+    // ---- debug overlay (TEMPORARY): live perspective tuning ----
+    this.debugOverlay = createDebugOverlay({
+      getValues: getGridParams,
+      onChange: (key, value) => {
+        setGridParams({ [key]: value });
+        this.redrawGrid();
+      },
+    });
+    document.getElementById('game').appendChild(this.debugOverlay.el);
+    this.debugVisible = true;
+    this.input.keyboard.on('keydown-D', () => {
+      this.debugVisible = !this.debugVisible;
+      this.debugOverlay.setVisible(this.debugVisible);
+      if (this.debugVisible) this.debugOverlay.refresh();
+    });
+
     // ---- input ----
     this.cursors = this.input.keyboard.createCursorKeys();
     this.keys = this.input.keyboard.addKeys('ONE,TWO,THREE,FOUR');
@@ -147,11 +164,26 @@ export default class BattleScene extends Phaser.Scene {
 
   drawGrid() {
     const g = this.add.graphics().setDepth(-5);
+    this.gridGraphics = g;
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         this.drawGlassTile(g, c, r);
       }
     }
+  }
+
+  // Destroy and rebuild the grid from the current params, then re-seat
+  // every fighter on its tile. Used by the debug overlay while tuning.
+  redrawGrid() {
+    if (this.gridGraphics) this.gridGraphics.destroy();
+    this.drawGrid();
+    this.placeFighter(this.navi, this.naviPos.col, this.naviPos.row, NAVI_MANUAL);
+    this.placeFighter(this.boss, this.bossPos.col, this.bossPos.row, BOSS_MANUAL);
+    if (this.mandrakeSprite.visible) {
+      this.placeFighter(this.mandrakeSprite, this.mandrake.pos.col, this.mandrake.pos.row, MANDRAKE_MANUAL);
+    }
+    const mp = tileFeet(this.mandrake.pos.col, this.mandrake.pos.row);
+    this.mound.setPosition(mp.x, mp.y - 8).setScale(mp.s).setDepth(9 + this.mandrake.pos.row);
   }
 
   // One glassy tile slab, matching battle-mockup.png: vertical glass
@@ -163,7 +195,7 @@ export default class BattleScene extends Phaser.Scene {
     const s = tl.s;
 
     // slab thickness: extrude the camera-side edge downward
-    const th = 16 * s;
+    const th = gridParams.thickness * s;
     g.fillStyle(hex(mixc(base, BLACK, 0.55)));
     g.fillPoints([bl, br, { x: br.x, y: br.y + th }, { x: bl.x, y: bl.y + th }], true);
 

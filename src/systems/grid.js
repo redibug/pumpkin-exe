@@ -11,25 +11,32 @@ export const ROWS = 3;
 export const PLAYER_COLS = [0, 1, 2];
 export const ENEMY_COLS = [3, 4, 5];
 
-const CX = 480;      // vanishing-point x (screen center)
-const HORIZON = 140; // screen y of the far grid edge
-const GROUND = 400;  // screen y of the near grid edge
-const BASE = 120;    // tile width in px at z = 1 (near edge)
-const ZNEAR = 1.0;
-const ZFAR = 2.0;
-const K = (GROUND - HORIZON) * ZNEAR;
+import GRID_CONFIG from '../../grid-config.json';
+
+// Live-tunable perspective parameters. Initialized from grid-config.json;
+// the debug overlay mutates these at runtime (and can save them back).
+export const gridParams = { ...GRID_CONFIG };
+
+export function setGridParams(patch) {
+  Object.assign(gridParams, patch);
+}
+
+export function getGridParams() {
+  return { ...gridParams };
+}
 
 /**
  * Project grid coords (gx in [0, COLS], gy in [0, ROWS]) to screen space.
  * @returns {{x: number, y: number, s: number}} screen pos + perspective scale.
  */
 export function project(gx, gy) {
+  const { cx, horizon, ground, base, zNear, zFar } = gridParams;
   const t = gy / ROWS;
-  const z = ZFAR + (ZNEAR - ZFAR) * t;
-  const s = ZNEAR / z;
+  const z = zFar + (zNear - zFar) * t;
+  const s = zNear / z;
   return {
-    x: CX + (gx - COLS / 2) * BASE * s,
-    y: HORIZON + K / z,
+    x: cx + (gx - COLS / 2) * base * s,
+    y: horizon + ((ground - horizon) * zNear) / z,
     s,
   };
 }
