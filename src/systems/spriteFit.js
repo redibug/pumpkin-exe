@@ -10,14 +10,21 @@
 export const FIT_MAX = 512;
 
 /**
+ * Fit factor for a sprite's texture: shrinks it within FIT_MAX px if the
+ * longest texture side exceeds it, else 1. Does not touch the sprite.
+ */
+export function fitFactor(sprite) {
+  const longest = Math.max(sprite.width, sprite.height);
+  return longest > FIT_MAX ? FIT_MAX / longest : 1;
+}
+
+/**
  * Fit a sprite's texture within FIT_MAX px, then apply manualScale.
  * Must be called after the texture is loaded (e.g. in Scene.create()).
  * @returns the final scale applied — handy for tweens that animate scale.
  */
 export function fitSprite(sprite, manualScale = 1) {
-  const longest = Math.max(sprite.width, sprite.height);
-  const fit = longest > FIT_MAX ? FIT_MAX / longest : 1;
-  const scale = fit * manualScale;
+  const scale = fitFactor(sprite) * manualScale;
   sprite.setScale(scale);
   return scale;
 }

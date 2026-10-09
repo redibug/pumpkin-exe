@@ -1,13 +1,31 @@
 import Phaser from 'phaser';
-import { COLS, ROWS, TILE_W, TILE_H, tileToWorld, isPlayerTile } from '../systems/grid.js';
+import { COLS, ROWS, project, tileCorners, tileFeet, tileCenter, isPlayerTile } from '../systems/grid.js';
 import { CHIPS, BOSS } from '../systems/chips.js';
 import { RUTABAGA_MANDRAKE } from '../systems/viruses.js';
-import { fitSprite } from '../systems/spriteFit.js';
+import { fitFactor } from '../systems/spriteFit.js';
 
 // BattleScene — written during the jam 72h window (2026-10-09).
 // MMBN-style grid battle: Bugchan (navi) vs PUMPKIN.EXE + RUTABAGA.MND.
 
 const M = RUTABAGA_MANDRAKE;
+
+// Manual artistic scales on top of the auto-fit + perspective scale.
+const NAVI_MANUAL = 1;
+const BOSS_MANUAL = 1;
+const MANDRAKE_MANUAL = 0.55;
+
+// ---- glassy tile palette (matches battle-mockup.png) ----
+const PINK = { r: 214, g: 60, b: 130 };  // player side
+const CYAN = { r: 40, g: 170, b: 210 };  // enemy side
+const WHITE = { r: 255, g: 255, b: 255 };
+const BLACK = { r: 0, g: 0, b: 0 };
+const hex = (c) => (c.r << 16) | (c.g << 8) | c.b;
+const mixc = (a, b, t) => ({
+  r: Math.round(a.r + (b.r - a.r) * t),
+  g: Math.round(a.g + (b.g - a.g) * t),
+  b: Math.round(a.b + (b.b - a.b) * t),
+});
+const lerpPt = (p, q, t) => ({ x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t });
 
 export default class BattleScene extends Phaser.Scene {
   constructor() {
@@ -60,21 +78,24 @@ export default class BattleScene extends Phaser.Scene {
       repeat: -1,
     });
 
-    const p = tileToWorld(this.naviPos.col, this.naviPos.row);
+    const p = tileFeet(this.naviPos.col, this.naviPos.row);
     this.navi = this.physics.add.sprite(p.x, p.y, 'bugchan');
     this.navi.play('bugchan-idle');
     this.navi.setOrigin(0.5, 1); // feet at the tile: she stands ON it
-    fitSprite(this.navi, 1);
+    this.placeFighter(this.navi, this.naviPos.col, this.naviPos.row, NAVI_MANUAL);
 
-    const bp = tileToWorld(this.bossPos.col, this.bossPos.row);
+    const bp = tileFeet(this.bossPos.col, this.bossPos.row);
     this.boss = this.physics.add.sprite(bp.x, bp.y, 'boss');
-    this.bossBaseScale = fitSprite(this.boss, 1);
+    this.boss.setOrigin(0.5, 1); // viruses stand on their tiles too
+    this.placeFighter(this.boss, this.bossPos.col, this.bossPos.row, BOSS_MANUAL);
 
     // mandrake: dirt mound (burrowed) + hidden sprite
-    const mp = tileToWorld(this.mandrake.pos.col, this.mandrake.pos.row);
-    this.mound = this.add.ellipse(mp.x, mp.y + 30, 70, 26, 0x5d3a1a);
+    const mp = tileFeet(this.mandrake.pos.col, this.mandrake.pos.row);
+    this.mound = this.add.ellipse(mp.x, mp.y - 8, 70, 26, 0x5d3a1a);
+    this.mound.setScale(mp.s).setDepth(9 + this.mandrake.pos.row);
     this.mandrakeSprite = this.physics.add.sprite(mp.x, mp.y, 'mandrake').setVisible(false);
-    this.mandrakeBaseScale = fitSprite(this.mandrakeSprite, 0.55);
+    this.mandrakeSprite.setOrigin(0.5, 1);
+    this.placeFighter(this.mandrakeSprite, this.mandrake.pos.col, this.mandrake.pos.row, MANDRAKE_MANUAL);
     this.mandrake.timer = this.time.now + M.burrowedMs;
 
     // ---- input ----
@@ -104,14 +125,71 @@ export default class BattleScene extends Phaser.Scene {
 
   // ================= grid + HUD =================
 
+  // Position a fighter on a tile: feet at the tile's front edge (origin
+  // 0.5, 1), scale follows the perspective depth, depth sorted by row.
+  placeFighter(sprite, c, r, manual = 1) {
+    const p = tileFeet(c, r);
+    sprite.setPosition(p.x, p.y);
+    sprite.setScale(fitFactor(sprite) * manual * p.s);
+    sprite.setDepth(10 + r);
+  }
+
+  // Translucent perspective highlight over a tile (telegraphs, sword arc).
+  highlightTile(c, r, color, alpha = 0.4) {
+    const g = this.add.graphics().setDepth(30);
+    const [tl, tr, br, bl] = tileCorners(c, r);
+    g.fillStyle(color, alpha);
+    g.fillPoints([tl, tr, br, bl], true);
+    g.lineStyle(3, color, 1);
+    g.strokePoints([tl, tr, br, bl, tl].map((p) => new Phaser.Geom.Point(p.x, p.y)), true);
+    return g;
+  }
+
   drawGrid() {
-    for (let c = 0; c < COLS; c++) {
-      for (let r = 0; r < ROWS; r++) {
-        const { x, y } = tileToWorld(c, r);
-        const key = isPlayerTile(c) ? 'tile-player' : 'tile-enemy';
-        this.add.image(x, y, key).setDisplaySize(TILE_W - 4, TILE_H - 4).setAlpha(0.85);
+    const g = this.add.graphics().setDepth(-5);
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        this.drawGlassTile(g, c, r);
       }
     }
+  }
+
+  // One glassy tile slab, matching battle-mockup.png: vertical glass
+  // gradient, corner-to-corner diagonal shine, bright readable edge, and
+  // a dark extruded slab edge on the camera side so tiles aren't flat.
+  drawGlassTile(g, c, r) {
+    const base = isPlayerTile(c) ? PINK : CYAN;
+    const [tl, tr, br, bl] = tileCorners(c, r);
+    const s = tl.s;
+
+    // slab thickness: extrude the camera-side edge downward
+    const th = 16 * s;
+    g.fillStyle(hex(mixc(base, BLACK, 0.55)));
+    g.fillPoints([bl, br, { x: br.x, y: br.y + th }, { x: bl.x, y: bl.y + th }], true);
+
+    // glassy vertical gradient, drawn as strips so it follows the perspective
+    const N = 14;
+    const topC = mixc(base, WHITE, 0.42);
+    const botC = mixc(base, BLACK, 0.38);
+    for (let i = 0; i < N; i++) {
+      const t0 = i / N, t1 = (i + 1) / N;
+      g.fillStyle(hex(mixc(topC, botC, (t0 + t1) / 2)));
+      g.fillPoints(
+        [lerpPt(tl, bl, t0), lerpPt(tr, br, t0), lerpPt(tr, br, t1), lerpPt(tl, bl, t1)],
+        true,
+      );
+    }
+
+    // diagonal shine, corner to corner
+    g.fillStyle(hex(mixc(topC, WHITE, 0.35)), 0.5);
+    g.fillPoints(
+      [lerpPt(tl, tr, 0.02), lerpPt(tl, tr, 0.32), lerpPt(bl, br, 0.98), lerpPt(bl, br, 0.68)],
+      true,
+    );
+
+    // crisp readable edge
+    g.lineStyle(2, hex(mixc(base, WHITE, 0.55)), 1);
+    g.strokePoints([tl, tr, br, bl, tl].map((p) => new Phaser.Geom.Point(p.x, p.y)), true);
   }
 
   drawHud() {
@@ -162,8 +240,7 @@ export default class BattleScene extends Phaser.Scene {
     nr = Phaser.Math.Clamp(nr, 0, ROWS - 1);
     if (nc !== col || nr !== row) {
       this.naviPos = { col: nc, row: nr };
-      const p = tileToWorld(nc, nr);
-      this.navi.setPosition(p.x, p.y);
+      this.placeFighter(this.navi, nc, nr, NAVI_MANUAL);
       this._lastMove = time;
     }
   }
@@ -184,7 +261,7 @@ export default class BattleScene extends Phaser.Scene {
   fireChip(chip, time) {
     if (!this.chipReady(chip, time)) return;
     this.chipCooldowns[chip.id] = time;
-    const { x } = tileToWorld(this.naviPos.col, this.naviPos.row);
+    const feet = tileFeet(this.naviPos.col, this.naviPos.row);
 
     if (chip.id === 'recover') {
       this.naviHp = Math.min(this.naviMaxHp, this.naviHp + 60);
@@ -204,8 +281,7 @@ export default class BattleScene extends Phaser.Scene {
       }
       if (hit) this.flash(this.boss, chip.color);
       // sword arc flash on the target tile
-      const sp = tileToWorld(target.col, target.row);
-      const arc = this.add.rectangle(sp.x, sp.y, TILE_W - 8, TILE_H - 8, chip.color, 0.35);
+      const arc = this.highlightTile(target.col, target.row, chip.color, 0.35);
       this.time.delayedCall(140, () => arc.destroy());
       return;
     }
@@ -214,7 +290,8 @@ export default class BattleScene extends Phaser.Scene {
       ? [this.naviPos.row - 1, this.naviPos.row, this.naviPos.row + 1].filter((r) => r >= 0 && r < ROWS)
       : [this.naviPos.row];
     rows.forEach((r) => {
-      const proj = this.add.circle(x + 30, tileToWorld(0, r).y, 10, chip.color);
+      const proj = this.add.circle(feet.x + 30, tileCenter(0, r).y, 10, chip.color);
+      proj.setDepth(20);
       this.physics.add.existing(proj);
       proj.setData('damage', chip.damage);
       this.projectiles.add(proj);
@@ -243,16 +320,14 @@ export default class BattleScene extends Phaser.Scene {
       const nc = Phaser.Math.Between(3, 5);
       const nr = Phaser.Math.Between(0, ROWS - 1);
       this.bossPos = { col: nc, row: nr };
-      const p = tileToWorld(nc, nr);
-      this.boss.setPosition(p.x, p.y);
+      this.placeFighter(this.boss, nc, nr, BOSS_MANUAL);
     }
 
     // telegraphed tile slam on the navi's tile
     if (time >= this.nextBossAttack) {
       this.nextBossAttack = time + phase.attackIntervalMs;
       const target = { col: this.naviPos.col, row: this.naviPos.row };
-      const { x, y } = tileToWorld(target.col, target.row);
-      const warn = this.add.rectangle(x, y, TILE_W - 6, TILE_H - 6, 0xff5252, 0.4);
+      const warn = this.highlightTile(target.col, target.row, 0xff5252, 0.4);
       this.time.delayedCall(700, () => {
         warn.destroy();
         if (this.over) return;
@@ -260,7 +335,9 @@ export default class BattleScene extends Phaser.Scene {
         if (this.naviPos.col === target.col && this.naviPos.row === target.row) {
           this.damageNavi(20);
         }
-        const boom = this.add.circle(x, y, 40, 0xff9e2c, 0.5);
+        const bc = tileCenter(target.col, target.row);
+        const boom = this.add.circle(bc.x, bc.y, 40, 0xff9e2c, 0.5);
+        boom.setDepth(25);
         this.tweens.add({ targets: boom, alpha: 0, scale: 1.6, duration: 250,
           onComplete: () => boom.destroy() });
       });
@@ -277,19 +354,19 @@ export default class BattleScene extends Phaser.Scene {
       // start telegraph: flash its tile
       md.state = 'telegraph';
       md.timer = time + M.telegraphMs;
-      const { x, y } = tileToWorld(md.pos.col, md.pos.row);
-      md.warnRect = this.add.rectangle(x, y, TILE_W - 6, TILE_H - 6, 0xba68c8, 0.45);
+      md.warnRect = this.highlightTile(md.pos.col, md.pos.row, 0xba68c8, 0.45);
       this.tweens.add({ targets: md.warnRect, alpha: 0.1, duration: 120, yoyo: 5 });
     } else if (md.state === 'telegraph') {
       // EMERGE
       if (md.warnRect) { md.warnRect.destroy(); md.warnRect = null; }
       md.state = 'emerged';
       md.timer = time + M.emergedMs;
-      const { x, y } = tileToWorld(md.pos.col, md.pos.row);
       this.mound.setVisible(false);
-      this.mandrakeSprite.setVisible(true).setPosition(x, y);
-      this.mandrakeSprite.setScale(this.mandrakeBaseScale * 0.18);
-      this.tweens.add({ targets: this.mandrakeSprite, scale: this.mandrakeBaseScale, duration: 180, ease: 'Back.easeOut' });
+      this.mandrakeSprite.setVisible(true);
+      this.placeFighter(this.mandrakeSprite, md.pos.col, md.pos.row, MANDRAKE_MANUAL);
+      const targetScale = this.mandrakeSprite.scaleX;
+      this.mandrakeSprite.setScale(targetScale * 0.18);
+      this.tweens.add({ targets: this.mandrakeSprite, scaleX: targetScale, scaleY: targetScale, duration: 180, ease: 'Back.easeOut' });
       if (!md.gagged) {
         md.gagged = true;
         this.bugchanSay(M.gag);
@@ -298,12 +375,15 @@ export default class BattleScene extends Phaser.Scene {
       // SCREAM — row-wide noise attack
       md.state = 'burrowed';
       md.timer = time + M.burrowedMs;
-      const { x, y } = tileToWorld(md.pos.col, md.pos.row);
-      // scream wave visual across the row
-      const wave = this.add.rectangle(x - 60, y, 620, 40, 0xba68c8, 0.35);
-      this.tweens.add({ targets: wave, alpha: 0, x: x - 320, duration: 350,
+      const rowC = tileCenter(md.pos.col, md.pos.row);
+      // scream wave visual across the row, following the perspective
+      const left = project(0, md.pos.row + 0.5);
+      const right = project(6, md.pos.row + 0.5);
+      const wave = this.add.rectangle((left.x + right.x) / 2, rowC.y, right.x - left.x, 40, 0xba68c8, 0.35);
+      wave.setDepth(25);
+      this.tweens.add({ targets: wave, alpha: 0, x: left.x - 40, duration: 350,
         onComplete: () => wave.destroy() });
-      this.add.text(x, y - 70, 'KYAAAH!!', {
+      this.add.text(rowC.x, rowC.y - 70, 'KYAAAH!!', {
         fontFamily: 'monospace', fontSize: '22px', color: '#ba68c8',
       }).setOrigin(0.5).setName('screamText');
       this.time.delayedCall(600, () => {
@@ -316,8 +396,9 @@ export default class BattleScene extends Phaser.Scene {
       // burrow at a new random enemy tile
       this.mandrakeSprite.setVisible(false);
       md.pos = { col: Phaser.Math.Between(3, 5), row: Phaser.Math.Between(0, ROWS - 1) };
-      const np = tileToWorld(md.pos.col, md.pos.row);
-      this.mound.setPosition(np.x, np.y + 30).setVisible(true);
+      const np = tileFeet(md.pos.col, md.pos.row);
+      this.mound.setPosition(np.x, np.y - 8).setVisible(true);
+      this.mound.setDepth(9 + md.pos.row).setScale(np.s);
     }
   }
 
@@ -343,7 +424,8 @@ export default class BattleScene extends Phaser.Scene {
     const t = this.children.getByName('bossHpText');
     if (t) t.setText(`${BOSS.name}  HP: ${this.bossHp}/${BOSS.maxHp}`);
     if (this.bossHp <= 0) {
-      this.tweens.add({ targets: this.boss, alpha: 0, scale: this.bossBaseScale * 1.2, duration: 400 });
+      const s0 = this.boss.scaleX;
+      this.tweens.add({ targets: this.boss, alpha: 0, scaleX: s0 * 1.2, scaleY: s0 * 1.2, duration: 400 });
     }
   }
 
@@ -355,7 +437,8 @@ export default class BattleScene extends Phaser.Scene {
     if (md.hp <= 0) {
       md.alive = false;
       if (md.warnRect) md.warnRect.destroy();
-      this.tweens.add({ targets: this.mandrakeSprite, alpha: 0, scale: this.mandrakeBaseScale * 1.45, duration: 350,
+      const s0 = this.mandrakeSprite.scaleX;
+      this.tweens.add({ targets: this.mandrakeSprite, alpha: 0, scaleX: s0 * 1.45, scaleY: s0 * 1.45, duration: 350,
         onComplete: () => this.mandrakeSprite.setVisible(false) });
     }
   }
