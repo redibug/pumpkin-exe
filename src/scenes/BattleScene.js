@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { COLS, ROWS, project, tileCorners, tileFeet, tileCenter, isPlayerTile, gridParams, setGridParams, getGridParams } from '../systems/grid.js';
+import { COLS, ROWS, project, tileCorners, tileFeet, tileCenter, isPlayerTile, gridParams, setGridParams, getGridParams, hexToRgb } from '../systems/grid.js';
 import { CHIPS, BOSS } from '../systems/chips.js';
 import { RUTABAGA_MANDRAKE } from '../systems/viruses.js';
 import { fitFactor } from '../systems/spriteFit.js';
@@ -15,9 +15,7 @@ const NAVI_MANUAL = 1;
 const BOSS_MANUAL = 1;
 const MANDRAKE_MANUAL = 0.55;
 
-// ---- glassy tile palette (matches battle-mockup.png) ----
-const PINK = { r: 214, g: 60, b: 130 };  // player side
-const CYAN = { r: 40, g: 170, b: 210 };  // enemy side
+// ---- glassy tile palette (base colors live in grid-config.json) ----
 const WHITE = { r: 255, g: 255, b: 255 };
 const BLACK = { r: 0, g: 0, b: 0 };
 const hex = (c) => (c.r << 16) | (c.g << 8) | c.b;
@@ -190,7 +188,7 @@ export default class BattleScene extends Phaser.Scene {
   // gradient, corner-to-corner diagonal shine, bright readable edge, and
   // a dark extruded slab edge on the camera side so tiles aren't flat.
   drawGlassTile(g, c, r) {
-    const base = isPlayerTile(c) ? PINK : CYAN;
+    const base = hexToRgb(isPlayerTile(c) ? gridParams.pink : gridParams.cyan);
     const [tl, tr, br, bl] = tileCorners(c, r);
     const s = tl.s;
 

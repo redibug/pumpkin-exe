@@ -25,6 +25,16 @@ export function getGridParams() {
   return { ...gridParams };
 }
 
+/** '#d63c82' -> { r: 214, g: 60, b: 130 } */
+export function hexToRgb(hexStr) {
+  const h = hexStr.replace('#', '');
+  return {
+    r: parseInt(h.slice(0, 2), 16),
+    g: parseInt(h.slice(2, 4), 16),
+    b: parseInt(h.slice(4, 6), 16),
+  };
+}
+
 /**
  * Project grid coords (gx in [0, COLS], gy in [0, ROWS]) to screen space.
  * @returns {{x: number, y: number, s: number}} screen pos + perspective scale.

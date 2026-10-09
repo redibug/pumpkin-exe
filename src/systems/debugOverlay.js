@@ -14,10 +14,15 @@ const FIELDS = [
   { key: 'thickness', label: 'slab px', step: 1 },
 ];
 
+const COLORS = [
+  { key: 'pink', label: 'player' },
+  { key: 'cyan', label: 'enemy' },
+];
+
 /**
  * @param {object} opts
  * @param {() => object} opts.getValues - current param values
- * @param {(key: string, value: number) => void} opts.onChange - field edited
+ * @param {(key: string, value: number|string) => void} opts.onChange - field edited
  * @returns {{ el: HTMLElement, setVisible(v: boolean): void, refresh(): void }}
  */
 export function createDebugOverlay({ getValues, onChange }) {
@@ -61,6 +66,24 @@ export function createDebugOverlay({ getValues, onChange }) {
     row.appendChild(inp);
     el.appendChild(row);
     inputs[f.key] = inp;
+  }
+
+  // tile base colors: native color pickers
+  const colorInputs = {};
+  for (const f of COLORS) {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;';
+    const lab = document.createElement('span');
+    lab.textContent = f.label + ' tile';
+    lab.style.color = '#8fa3c8';
+    const inp = document.createElement('input');
+    inp.type = 'color';
+    inp.style.cssText = 'width:84px;height:24px;background:#101828;border:1px solid #3a4a6a;border-radius:4px;padding:1px 3px;cursor:pointer;';
+    inp.addEventListener('input', () => onChange(f.key, inp.value));
+    row.appendChild(lab);
+    row.appendChild(inp);
+    el.appendChild(row);
+    colorInputs[f.key] = inp;
   }
 
   const saveRow = document.createElement('div');
@@ -111,6 +134,9 @@ export function createDebugOverlay({ getValues, onChange }) {
       if (document.activeElement !== inputs[f.key]) {
         inputs[f.key].value = vals[f.key];
       }
+    }
+    for (const f of COLORS) {
+      colorInputs[f.key].value = vals[f.key];
     }
   }
   function setVisible(v) {

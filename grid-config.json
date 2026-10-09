@@ -1,9 +1,11 @@
 {
   "cx": 480,
-  "horizon": 287,
-  "ground": 463,
-  "base": 141,
-  "zNear": 1.15,
+  "horizon": 140,
+  "ground": 400,
+  "base": 120,
+  "zNear": 1,
   "zFar": 2,
-  "thickness": 16
+  "thickness": 16,
+  "pink": "#d63c82",
+  "cyan": "#28aad2"
 }
