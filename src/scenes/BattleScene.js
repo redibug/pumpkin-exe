@@ -63,11 +63,11 @@ export default class BattleScene extends Phaser.Scene {
     const p = tileToWorld(this.naviPos.col, this.naviPos.row);
     this.navi = this.physics.add.sprite(p.x, p.y, 'bugchan');
     this.navi.play('bugchan-idle');
-    fitSprite(this.navi, 2);
+    fitSprite(this.navi, 1);
 
     const bp = tileToWorld(this.bossPos.col, this.bossPos.row);
     this.boss = this.physics.add.sprite(bp.x, bp.y, 'boss');
-    this.bossBaseScale = fitSprite(this.boss, 2.5);
+    this.bossBaseScale = fitSprite(this.boss, 1);
 
     // mandrake: dirt mound (burrowed) + hidden sprite
     const mp = tileToWorld(this.mandrake.pos.col, this.mandrake.pos.row);
