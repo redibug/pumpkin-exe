@@ -63,6 +63,7 @@ export default class BattleScene extends Phaser.Scene {
     const p = tileToWorld(this.naviPos.col, this.naviPos.row);
     this.navi = this.physics.add.sprite(p.x, p.y, 'bugchan');
     this.navi.play('bugchan-idle');
+    this.navi.setOrigin(0.5, 1); // feet at the tile: she stands ON it
     fitSprite(this.navi, 1);
 
     const bp = tileToWorld(this.bossPos.col, this.bossPos.row);
