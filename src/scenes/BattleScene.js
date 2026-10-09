@@ -154,13 +154,26 @@ export default class BattleScene extends Phaser.Scene {
 
   // Freeze the whole game while a script plays: physics, tweens, timers,
   // animations. update() routes to the dialogue instead of game logic.
+  //
+  // NB: Phaser's Clock keeps advancing .now even when paused (it assigns
+  // this.now before the paused check), so AI timers set from it would all
+  // expire during a long dialogue. We measure the pause and shift every
+  // pending timer forward on resume, so the pause costs zero game time.
   setPaused(paused) {
     if (paused) {
+      this.pauseStart = this.time.now;
       this.physics.world.pause();
       this.tweens.pauseAll();
       this.anims.pauseAll();
       this.time.paused = true;
     } else {
+      const pausedMs = this.time.now - (this.pauseStart || this.time.now);
+      for (const key of ['nextBossMove', 'nextBossAttack']) {
+        if (Number.isFinite(this[key])) this[key] += pausedMs;
+      }
+      if (Number.isFinite(this.mandrake.timer)) this.mandrake.timer += pausedMs;
+      if (Number.isFinite(this._lastMove)) this._lastMove += pausedMs;
+      for (const k of Object.keys(this.chipCooldowns)) this.chipCooldowns[k] += pausedMs;
       this.physics.world.resume();
       this.tweens.resumeAll();
       this.anims.resumeAll();
