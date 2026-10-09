@@ -159,13 +159,24 @@ export default class BattleScene extends Phaser.Scene {
   // this.now before the paused check), so AI timers set from it would all
   // expire during a long dialogue. We measure the pause and shift every
   // pending timer forward on resume, so the pause costs zero game time.
+  //
+  // Looping ambient motion (idle animations, infinite tweens) keeps playing
+  // so the scene stays alive; anything finite or gameplay-coupled pauses.
   setPaused(paused) {
     if (paused) {
       this.pauseStart = this.time.now;
       this.physics.world.pause();
-      this.tweens.pauseAll();
-      this.anims.pauseAll();
       this.time.paused = true;
+      this._pausedAnims = [];
+      for (const child of this.children.list) {
+        const a = child.anims;
+        if (a && a.isPlaying && a.currentAnim && a.currentAnim.repeat !== -1) {
+          a.pause();
+          this._pausedAnims.push(a);
+        }
+      }
+      this._pausedTweens = this.tweens.getTweens().filter((t) => !t.isInfinite && !t.isFinished());
+      this._pausedTweens.forEach((t) => { t.paused = true; });
     } else {
       const pausedMs = this.time.now - (this.pauseStart || this.time.now);
       for (const key of ['nextBossMove', 'nextBossAttack']) {
@@ -175,9 +186,11 @@ export default class BattleScene extends Phaser.Scene {
       if (Number.isFinite(this._lastMove)) this._lastMove += pausedMs;
       for (const k of Object.keys(this.chipCooldowns)) this.chipCooldowns[k] += pausedMs;
       this.physics.world.resume();
-      this.tweens.resumeAll();
-      this.anims.resumeAll();
       this.time.paused = false;
+      (this._pausedAnims || []).forEach((a) => a.resume());
+      (this._pausedTweens || []).forEach((t) => { t.paused = false; });
+      this._pausedAnims = [];
+      this._pausedTweens = [];
     }
   }
 
