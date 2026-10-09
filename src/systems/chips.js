@@ -1,0 +1,20 @@
+// Static deck — no deckbuilder. A fixed loadout of battle chips,
+// each with a cooldown so the player cycles through them MMBN-style.
+
+export const CHIPS = [
+  { id: 'cannon',  name: 'Cannon',  damage: 40, cooldownMs: 2500, color: 0xffa726, desc: 'Fires a straight shot down the row.' },
+  { id: 'sword',   name: 'Sword',   damage: 80, cooldownMs: 4000, color: 0x4fc3f7, desc: 'Slashes the tile directly ahead.' },
+  { id: 'spread',  name: 'Spread',  damage: 25, cooldownMs: 3500, color: 0xba68c8, desc: 'Hits the target row and the rows above/below.' },
+  { id: 'recover', name: 'Recover', damage: 0,  cooldownMs: 9000, color: 0x81c784, desc: 'Restores 60 HP to the navi.' },
+];
+
+// Boss data — PUMPKIN.EXE. Phases keyed by HP thresholds.
+export const BOSS = {
+  name: 'PUMPKIN.EXE',
+  maxHp: 600,
+  phases: [
+    { threshold: 1.0, name: 'Sprout',  moveIntervalMs: 1400, attackIntervalMs: 2200 },
+    { threshold: 0.6, name: 'Vine',    moveIntervalMs: 1000, attackIntervalMs: 1700 },
+    { threshold: 0.3, name: 'Harvest', moveIntervalMs: 700,  attackIntervalMs: 1200 },
+  ],
+};
