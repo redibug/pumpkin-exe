@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { COLS, ROWS, TILE_W, TILE_H, tileToWorld, isPlayerTile } from '../systems/grid.js';
 import { CHIPS, BOSS } from '../systems/chips.js';
 import { RUTABAGA_MANDRAKE } from '../systems/viruses.js';
+import { fitSprite } from '../systems/spriteFit.js';
 
 // BattleScene — written during the jam 72h window (2026-10-09).
 // MMBN-style grid battle: Bugchan (navi) vs PUMPKIN.EXE + RUTABAGA.MND.
@@ -16,7 +17,7 @@ export default class BattleScene extends Phaser.Scene {
   preload() {
     this.load.image('tile-player', 'assets/tiles/tile-player.png');
     this.load.image('tile-enemy', 'assets/tiles/tile-enemy.png');
-    this.load.image('navi', 'assets/sprites/navi.png');
+    this.load.spritesheet('bugchan', 'assets/sprites/bugchan-idle-strip.png', { frameWidth: 112, frameHeight: 224 });
     this.load.image('boss', 'assets/sprites/boss-pumpkin.png');
     this.load.image('mandrake', 'assets/sprites/virus-rutabaga-mandrake.png');
     this.load.image('bg', 'assets/tiles/bg-cyberspace.png');
@@ -51,17 +52,28 @@ export default class BattleScene extends Phaser.Scene {
     this.drawGrid();
     this.drawHud();
 
+    // player idle animation (8-frame strip)
+    this.anims.create({
+      key: 'bugchan-idle',
+      frames: this.anims.generateFrameNumbers('bugchan', { start: 0, end: 7 }),
+      frameRate: 8,
+      repeat: -1,
+    });
+
     const p = tileToWorld(this.naviPos.col, this.naviPos.row);
-    this.navi = this.physics.add.sprite(p.x, p.y, 'navi').setScale(2);
+    this.navi = this.physics.add.sprite(p.x, p.y, 'bugchan');
+    this.navi.play('bugchan-idle');
+    fitSprite(this.navi, 2);
 
     const bp = tileToWorld(this.bossPos.col, this.bossPos.row);
-    this.boss = this.physics.add.sprite(bp.x, bp.y, 'boss').setScale(2.5);
+    this.boss = this.physics.add.sprite(bp.x, bp.y, 'boss');
+    this.bossBaseScale = fitSprite(this.boss, 2.5);
 
     // mandrake: dirt mound (burrowed) + hidden sprite
     const mp = tileToWorld(this.mandrake.pos.col, this.mandrake.pos.row);
     this.mound = this.add.ellipse(mp.x, mp.y + 30, 70, 26, 0x5d3a1a);
-    this.mandrakeSprite = this.physics.add.sprite(mp.x, mp.y, 'mandrake')
-      .setScale(0.55).setVisible(false);
+    this.mandrakeSprite = this.physics.add.sprite(mp.x, mp.y, 'mandrake').setVisible(false);
+    this.mandrakeBaseScale = fitSprite(this.mandrakeSprite, 0.55);
     this.mandrake.timer = this.time.now + M.burrowedMs;
 
     // ---- input ----
@@ -275,8 +287,8 @@ export default class BattleScene extends Phaser.Scene {
       const { x, y } = tileToWorld(md.pos.col, md.pos.row);
       this.mound.setVisible(false);
       this.mandrakeSprite.setVisible(true).setPosition(x, y);
-      this.mandrakeSprite.setScale(0.1);
-      this.tweens.add({ targets: this.mandrakeSprite, scale: 0.55, duration: 180, ease: 'Back.easeOut' });
+      this.mandrakeSprite.setScale(this.mandrakeBaseScale * 0.18);
+      this.tweens.add({ targets: this.mandrakeSprite, scale: this.mandrakeBaseScale, duration: 180, ease: 'Back.easeOut' });
       if (!md.gagged) {
         md.gagged = true;
         this.bugchanSay(M.gag);
@@ -330,7 +342,7 @@ export default class BattleScene extends Phaser.Scene {
     const t = this.children.getByName('bossHpText');
     if (t) t.setText(`${BOSS.name}  HP: ${this.bossHp}/${BOSS.maxHp}`);
     if (this.bossHp <= 0) {
-      this.tweens.add({ targets: this.boss, alpha: 0, scale: 3, duration: 400 });
+      this.tweens.add({ targets: this.boss, alpha: 0, scale: this.bossBaseScale * 1.2, duration: 400 });
     }
   }
 
@@ -342,7 +354,7 @@ export default class BattleScene extends Phaser.Scene {
     if (md.hp <= 0) {
       md.alive = false;
       if (md.warnRect) md.warnRect.destroy();
-      this.tweens.add({ targets: this.mandrakeSprite, alpha: 0, scale: 0.8, duration: 350,
+      this.tweens.add({ targets: this.mandrakeSprite, alpha: 0, scale: this.mandrakeBaseScale * 1.45, duration: 350,
         onComplete: () => this.mandrakeSprite.setVisible(false) });
     }
   }
