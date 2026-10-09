@@ -25,25 +25,6 @@ export function getGridParams() {
   return { ...gridParams };
 }
 
-// Local tuning override: grid-config.local.json (gitignored, written by the
-// debug overlay) wins over the committed defaults when present. Loaded async;
-// scenes should use onGridParamsReady() to redraw once it lands.
-let gridParamsReady = false;
-const readyListeners = [];
-export function onGridParamsReady(cb) {
-  if (gridParamsReady) cb();
-  else readyListeners.push(cb);
-}
-fetch('grid-config.local.json')
-  .then((r) => (r.ok ? r.json() : {}))
-  .catch(() => ({}))
-  .then((local) => {
-    Object.assign(gridParams, local);
-    gridParamsReady = true;
-    readyListeners.forEach((cb) => cb());
-    readyListeners.length = 0;
-  });
-
 /** '#d63c82' -> { r: 214, g: 60, b: 130 } */
 export function hexToRgb(hexStr) {
   const h = hexStr.replace('#', '');
