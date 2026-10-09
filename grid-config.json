@@ -1,11 +1,1 @@
-{
-  "cx": 480,
-  "horizon": 140,
-  "ground": 400,
-  "base": 120,
-  "zNear": 1,
-  "zFar": 2,
-  "thickness": 16,
-  "pink": "#d63c82",
-  "cyan": "#28aad2"
-}
+{"base":141,"cx":480,"cyan":"#28aad2","ground":463,"horizon":287,"pink":"#d63c82","thickness":16,"zFar":2,"zNear":1.15}
