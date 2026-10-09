@@ -162,6 +162,7 @@ export default class BattleScene extends Phaser.Scene {
 
   drawGrid() {
     const g = this.add.graphics().setDepth(-5);
+    g.setBlendMode(Phaser.BlendModes[gridParams.blendMode] ?? Phaser.BlendModes.NORMAL);
     this.gridGraphics = g;
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {

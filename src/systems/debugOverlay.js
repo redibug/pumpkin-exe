@@ -19,6 +19,10 @@ const COLORS = [
   { key: 'cyan', label: 'enemy' },
 ];
 
+const SELECTS = [
+  { key: 'blendMode', label: 'blend', options: ['NORMAL', 'SCREEN', 'ADD', 'MULTIPLY', 'OVERLAY'] },
+];
+
 /**
  * @param {object} opts
  * @param {() => object} opts.getValues - current param values
@@ -66,6 +70,29 @@ export function createDebugOverlay({ getValues, onChange }) {
     row.appendChild(inp);
     el.appendChild(row);
     inputs[f.key] = inp;
+  }
+
+  // blend mode + other dropdowns
+  const selectInputs = {};
+  for (const f of SELECTS) {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;';
+    const lab = document.createElement('span');
+    lab.textContent = f.label;
+    lab.style.color = '#8fa3c8';
+    const sel = document.createElement('select');
+    sel.style.cssText = 'width:84px;background:#101828;color:#e8f6ff;border:1px solid #3a4a6a;border-radius:4px;padding:2px 4px;font:12px monospace;cursor:pointer;';
+    for (const opt of f.options) {
+      const o = document.createElement('option');
+      o.value = opt;
+      o.textContent = opt.toLowerCase();
+      sel.appendChild(o);
+    }
+    sel.addEventListener('change', () => onChange(f.key, sel.value));
+    row.appendChild(lab);
+    row.appendChild(sel);
+    el.appendChild(row);
+    selectInputs[f.key] = sel;
   }
 
   // tile base colors: native color pickers
@@ -137,6 +164,9 @@ export function createDebugOverlay({ getValues, onChange }) {
     }
     for (const f of COLORS) {
       colorInputs[f.key].value = vals[f.key];
+    }
+    for (const f of SELECTS) {
+      if (vals[f.key] !== undefined) selectInputs[f.key].value = vals[f.key];
     }
   }
   function setVisible(v) {
