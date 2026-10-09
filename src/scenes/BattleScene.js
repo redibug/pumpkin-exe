@@ -202,6 +202,88 @@ export default class BattleScene extends Phaser.Scene {
     });
   }
 
+  // ================= teleport =================
+
+  // Vertical-slice teleport dissolve, recreated in-engine from Mel's
+  // teleport-smear strip art: the sprite is sliced into vertical strips
+  // that jitter vertically and get erased, more intense in later frames.
+  // 3 frames out (dissolve), then 3 in reverse (materialize).
+  // Movement input / AI is locked per-sprite while its teleport runs.
+  teleportMove(sprite, col, row, manual, onDone) {
+    if (sprite.getData('teleporting')) {
+      this.placeFighter(sprite, col, row, manual); // fallback: instant pop
+      if (onDone) onDone();
+      return;
+    }
+    sprite.setData('teleporting', true);
+    this.playTeleportFrames(sprite, 'out', () => {
+      this.placeFighter(sprite, col, row, manual);
+      this.playTeleportFrames(sprite, 'in', () => {
+        sprite.setData('teleporting', false);
+        if (onDone) onDone();
+      });
+    });
+  }
+
+  playTeleportFrames(sprite, direction, onDone) {
+    const STRIPS = 14;
+    const FRAME_MS = 70;
+    const JITTER = [4, 10, 18];      // vertical jitter px, grows per frame
+    const HIDE = [0.25, 0.5, 0.75];  // fraction of strips erased per frame
+
+    const frame = sprite.frame;
+    const fw = frame.width, fh = frame.height;
+    const sw = fw / STRIPS;
+    const scale = sprite.scaleX;
+    const ox = sprite.x, oy = sprite.y;
+    const key = sprite.texture.key;
+    const frameName = frame.name;
+
+    sprite.setVisible(false);
+
+    // slice the current frame into vertical strips, aligned 1:1 over the sprite
+    const objs = [];
+    for (let i = 0; i < STRIPS; i++) {
+      const img = this.add.image(ox, oy, key, frameName);
+      img.setOrigin(0.5, 1).setScale(scale).setDepth(sprite.depth + 1);
+      img.setCrop(i * sw, 0, sw, fh);
+      objs.push(img);
+    }
+
+    // precompute the 3 frames: cumulative erase + growing jitter
+    const frames = [];
+    const hidden = new Set();
+    for (let f = 0; f < 3; f++) {
+      while (hidden.size < Math.floor(STRIPS * HIDE[f])) {
+        hidden.add((Math.random() * STRIPS) | 0);
+      }
+      const st = [];
+      for (let i = 0; i < STRIPS; i++) {
+        st.push({ visible: !hidden.has(i), yOff: (Math.random() * 2 - 1) * JITTER[f] });
+      }
+      frames.push(st);
+    }
+    const order = direction === 'out' ? [0, 1, 2] : [2, 1, 0];
+
+    let step = 0;
+    const tick = () => {
+      if (step < order.length) {
+        const st = frames[order[step]];
+        for (let i = 0; i < STRIPS; i++) {
+          objs[i].setVisible(st[i].visible);
+          objs[i].setY(oy + st[i].yOff);
+        }
+        step++;
+        this.time.delayedCall(FRAME_MS, tick);
+      } else {
+        objs.forEach((o) => o.destroy());
+        if (direction === 'in') sprite.setVisible(true);
+        onDone();
+      }
+    };
+    tick();
+  }
+
   // ================= grid + HUD =================
 
   // Position a fighter on a tile: feet at the tile's front edge (origin
@@ -327,6 +409,7 @@ export default class BattleScene extends Phaser.Scene {
   // ================= navi =================
 
   handleMovement(time) {
+    if (this.navi.getData('teleporting')) return;
     if (this._lastMove && time - this._lastMove < 160) return;
     const { col, row } = this.naviPos;
     let nc = col, nr = row;
@@ -340,8 +423,8 @@ export default class BattleScene extends Phaser.Scene {
     nr = Phaser.Math.Clamp(nr, 0, ROWS - 1);
     if (nc !== col || nr !== row) {
       this.naviPos = { col: nc, row: nr };
-      this.placeFighter(this.navi, nc, nr, NAVI_MANUAL);
       this._lastMove = time;
+      this.teleportMove(this.navi, nc, nr, NAVI_MANUAL);
     }
   }
 
@@ -420,7 +503,7 @@ export default class BattleScene extends Phaser.Scene {
       const nc = Phaser.Math.Between(3, 5);
       const nr = Phaser.Math.Between(0, ROWS - 1);
       this.bossPos = { col: nc, row: nr };
-      this.placeFighter(this.boss, nc, nr, BOSS_MANUAL);
+      this.teleportMove(this.boss, nc, nr, BOSS_MANUAL);
     }
 
     // telegraphed tile slam on the navi's tile
