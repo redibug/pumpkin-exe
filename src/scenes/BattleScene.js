@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { COLS, ROWS, project, tileCorners, tileFeet, tileCenter, isPlayerTile, gridParams, setGridParams, getGridParams, hexToRgb } from '../systems/grid.js';
+import { COLS, ROWS, project, tileCorners, tileFeet, tileCenter, isPlayerTile, gridParams, setGridParams, getGridParams, hexToRgb, onGridParamsReady } from '../systems/grid.js';
 import { CHIPS, BOSS } from '../systems/chips.js';
 import { RUTABAGA_MANDRAKE } from '../systems/viruses.js';
 import { fitFactor } from '../systems/spriteFit.js';
@@ -111,6 +111,11 @@ export default class BattleScene extends Phaser.Scene {
       this.debugVisible = !this.debugVisible;
       this.debugOverlay.setVisible(this.debugVisible);
       if (this.debugVisible) this.debugOverlay.refresh();
+    });
+    // apply personal tuning (grid-config.local.json) once it loads
+    onGridParamsReady(() => {
+      this.redrawGrid();
+      this.debugOverlay.refresh();
     });
 
     // ---- input ----

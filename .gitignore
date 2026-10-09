@@ -4,3 +4,5 @@ dist/
 .thumbnails/
 media-generation-*.webp
 .DS_Store
+# local perspective tuning (written by the debug overlay, never commit)
+grid-config.local.json

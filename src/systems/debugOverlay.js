@@ -1,8 +1,8 @@
 // debugOverlay.js — TEMPORARY jam tuning rig (hide before shipping).
-// DOM panel with live fields for the perspective params in grid-config.json.
-// Editing a field updates the in-memory params and redraws the grid;
-// the Save button writes the JSON file back via the vite dev middleware
-// (falls back to a download outside the dev server).
+// DOM panel with live fields for the perspective params. Editing a field
+// updates the in-memory params and redraws the grid; the Save button writes
+// grid-config.local.json (gitignored personal tuning) via the vite dev
+// middleware (falls back to a download outside the dev server).
 
 const FIELDS = [
   { key: 'cx', label: 'vanish x', step: 1 },
@@ -89,7 +89,8 @@ export function createDebugOverlay({ getValues, onChange }) {
   const saveRow = document.createElement('div');
   saveRow.style.cssText = 'display:flex;gap:8px;margin-top:8px;align-items:center;';
   const saveBtn = document.createElement('button');
-  saveBtn.textContent = '💾 save json';
+  saveBtn.textContent = '💾 save local';
+  saveBtn.title = 'writes grid-config.local.json (gitignored personal tuning)';
   saveBtn.style.cssText = 'flex:1;background:#1d3a5f;color:#e8f6ff;border:1px solid #3a6a9a;border-radius:4px;padding:4px;cursor:pointer;font:12px monospace;';
   const status = document.createElement('span');
   status.style.cssText = 'font-size:11px;color:#8fa3c8;';
@@ -101,7 +102,7 @@ export function createDebugOverlay({ getValues, onChange }) {
     status.textContent = 'saving…';
     status.style.color = '#8fa3c8';
     try {
-      const res = await fetch('/__grid-config', {
+      const res = await fetch('/__grid-config-local', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(getValues(), null, 2),
@@ -114,7 +115,7 @@ export function createDebugOverlay({ getValues, onChange }) {
       const blob = new Blob([JSON.stringify(getValues(), null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'grid-config.json';
+      a.download = 'grid-config.local.json';
       a.click();
       URL.revokeObjectURL(a.href);
       status.textContent = 'downloaded';
