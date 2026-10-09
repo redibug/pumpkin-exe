@@ -226,8 +226,8 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   playTeleportFrames(sprite, direction, onDone) {
-    const STRIPS = 14;
-    const FRAME_MS = 70;
+    const STRIPS = 40;
+    const FRAME_MS = 6;
     const JITTER = [4, 10, 18];      // vertical jitter px, grows per frame
     const HIDE = [0.25, 0.5, 0.75];  // fraction of strips erased per frame
 
