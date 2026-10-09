@@ -13,8 +13,8 @@ const M = RUTABAGA_MANDRAKE;
 
 // Manual artistic scales on top of the auto-fit + perspective scale.
 const NAVI_MANUAL = 1;
-const BOSS_MANUAL = 1;
-const MANDRAKE_MANUAL = 0.55;
+const BOSS_MANUAL = 0.5;
+const MANDRAKE_MANUAL = 0.25;
 
 // ---- glassy tile palette (base colors live in grid-config.json) ----
 const WHITE = { r: 255, g: 255, b: 255 };
