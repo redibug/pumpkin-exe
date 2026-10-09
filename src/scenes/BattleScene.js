@@ -4,6 +4,7 @@ import { CHIPS, BOSS } from '../systems/chips.js';
 import { RUTABAGA_MANDRAKE } from '../systems/viruses.js';
 import { fitFactor } from '../systems/spriteFit.js';
 import { createDebugOverlay } from '../systems/debugOverlay.js';
+import { DialogueUI, SCRIPTS } from '../systems/dialogue.js';
 
 // BattleScene — written during the jam 72h window (2026-10-09).
 // MMBN-style grid battle: Bugchan (navi) vs PUMPKIN.EXE + RUTABAGA.MND.
@@ -42,10 +43,14 @@ export default class BattleScene extends Phaser.Scene {
     this.load.image('chip-sword', 'assets/ui/chip-sword.png');
     this.load.image('chip-spread', 'assets/ui/chip-spread.png');
     this.load.image('chip-recover', 'assets/ui/chip-recover.png');
+    this.load.image('mug-bugchan', 'assets/mugshots/mug-bugchan.png');
+    this.load.image('mug-pumpkin', 'assets/mugshots/mug-pumpkin.png');
+    this.load.image('mug-mandrake', 'assets/mugshots/mug-mandrake.png');
   }
 
   create() {
     this.over = false;
+    this.time.paused = false; // insurance: never boot a restart mid-pause
 
     // ---- state ----
     this.naviHp = 100; this.naviMaxHp = 100;
@@ -95,7 +100,8 @@ export default class BattleScene extends Phaser.Scene {
     this.mandrakeSprite = this.physics.add.sprite(mp.x, mp.y, 'mandrake').setVisible(false);
     this.mandrakeSprite.setOrigin(0.5, 1);
     this.placeFighter(this.mandrakeSprite, this.mandrake.pos.col, this.mandrake.pos.row, MANDRAKE_MANUAL);
-    this.mandrake.timer = this.time.now + M.burrowedMs;
+    // NB: mandrake.timer + boss AI timers are armed when the intro
+    // dialogue finishes, so the battle doesn't run during the cutscene.
 
     // ---- debug overlay (TEMPORARY): live perspective tuning ----
     this.debugOverlay = createDebugOverlay({
@@ -129,13 +135,45 @@ export default class BattleScene extends Phaser.Scene {
       proj.destroy();
     });
 
-    // boss AI timers
-    this.nextBossMove = this.time.now + 1400;
-    this.nextBossAttack = this.time.now + 2200;
+    // ---- dialogue ----
+    this.dialogue = new DialogueUI(this);
 
     this.add.text(480, 20, `${BOSS.name}  HP: ${this.bossHp}/${BOSS.maxHp}`, {
       fontFamily: 'monospace', fontSize: '20px', color: '#ffb74d',
     }).setOrigin(0.5).setName('bossHpText');
+
+    // battle intro; the fight starts when it finishes
+    this.startDialogue(SCRIPTS.intro, () => {
+      this.nextBossMove = this.time.now + 1400;
+      this.nextBossAttack = this.time.now + 2200;
+      this.mandrake.timer = this.time.now + M.burrowedMs;
+    });
+  }
+
+  // ================= dialogue + pause =================
+
+  // Freeze the whole game while a script plays: physics, tweens, timers,
+  // animations. update() routes to the dialogue instead of game logic.
+  setPaused(paused) {
+    if (paused) {
+      this.physics.world.pause();
+      this.tweens.pauseAll();
+      this.anims.pauseAll();
+      this.time.paused = true;
+    } else {
+      this.physics.world.resume();
+      this.tweens.resumeAll();
+      this.anims.resumeAll();
+      this.time.paused = false;
+    }
+  }
+
+  startDialogue(script, onDone) {
+    this.setPaused(true);
+    this.dialogue.start(script, () => {
+      this.setPaused(false);
+      if (onDone) onDone();
+    });
   }
 
   // ================= grid + HUD =================
@@ -245,7 +283,12 @@ export default class BattleScene extends Phaser.Scene {
 
   // ================= main loop =================
 
-  update(time) {
+  update(time, delta) {
+    // dialogue owns the frame while a script plays: the game is paused
+    if (this.dialogue.isActive()) {
+      this.dialogue.update(delta);
+      return;
+    }
     if (this.over) return;
     this.handleMovement(time);
     this.handleChips(time);
@@ -400,7 +443,7 @@ export default class BattleScene extends Phaser.Scene {
       this.tweens.add({ targets: this.mandrakeSprite, scaleX: targetScale, scaleY: targetScale, duration: 180, ease: 'Back.easeOut' });
       if (!md.gagged) {
         md.gagged = true;
-        this.bugchanSay(M.gag);
+        this.startDialogue(SCRIPTS.mandrakeGag);
       }
     } else if (md.state === 'emerged') {
       // SCREAM — row-wide noise attack
@@ -431,14 +474,6 @@ export default class BattleScene extends Phaser.Scene {
       this.mound.setPosition(np.x, np.y - 8).setVisible(true);
       this.mound.setDepth(9 + md.pos.row).setScale(np.s);
     }
-  }
-
-  bugchanSay(text) {
-    const s = this.add.text(480, 80, `Bugchan: "${text}"`, {
-      fontFamily: 'monospace', fontSize: '16px', color: '#f8bbd0',
-      backgroundColor: '#101828', padding: { x: 10, y: 6 },
-    }).setOrigin(0.5);
-    this.time.delayedCall(2600, () => s.destroy());
   }
 
   // ================= damage =================
@@ -492,30 +527,40 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   checkEnd() {
+    // don't trigger endings twice, or while a script is playing
+    if (this.over || this.dialogue.isActive()) return;
     const bossDead = this.bossHp <= 0;
     const mandrakeDead = !this.mandrake.alive;
-    if (this.naviHp <= 0 && !this.over) {
-      this.over = true;
-      this.add.text(480, 250, 'GAME OVER', {
-        fontFamily: 'monospace', fontSize: '56px', color: '#ff5252',
-      }).setOrigin(0.5);
-      this.add.text(480, 320, 'press R to jack in again', {
-        fontFamily: 'monospace', fontSize: '18px', color: '#9fb3c8',
-      }).setOrigin(0.5);
-      this.input.keyboard.once('keydown-R', () => this.scene.restart());
+    if (this.naviHp <= 0) {
+      this.startDialogue(SCRIPTS.defeat, () => this.showGameOver());
       return;
     }
-    if (bossDead && mandrakeDead && !this.over) {
-      this.over = true;
-      this.add.text(480, 250, 'VIRUS DELETED', {
-        fontFamily: 'monospace', fontSize: '56px', color: '#81c784',
-      }).setOrigin(0.5);
-      this.add.text(480, 320, 'PUMPKIN.EXE + RUTABAGA.MND busted!', {
-        fontFamily: 'monospace', fontSize: '18px', color: '#9fb3c8',
-      }).setOrigin(0.5);
-      this.add.text(480, 360, 'thanks for playing! 🎃🥕', {
-        fontFamily: 'monospace', fontSize: '18px', color: '#9fb3c8',
-      }).setOrigin(0.5);
+    if (bossDead && mandrakeDead) {
+      this.startDialogue(SCRIPTS.victory, () => this.showVictory());
     }
+  }
+
+  showGameOver() {
+    this.over = true;
+    this.add.text(480, 250, 'GAME OVER', {
+      fontFamily: 'monospace', fontSize: '56px', color: '#ff5252',
+    }).setOrigin(0.5);
+    this.add.text(480, 320, 'press R to jack in again', {
+      fontFamily: 'monospace', fontSize: '18px', color: '#9fb3c8',
+    }).setOrigin(0.5);
+    this.input.keyboard.once('keydown-R', () => this.scene.restart());
+  }
+
+  showVictory() {
+    this.over = true;
+    this.add.text(480, 250, 'VIRUS DELETED', {
+      fontFamily: 'monospace', fontSize: '56px', color: '#81c784',
+    }).setOrigin(0.5);
+    this.add.text(480, 320, 'PUMPKIN.EXE + RUTABAGA.MND busted!', {
+      fontFamily: 'monospace', fontSize: '18px', color: '#9fb3c8',
+    }).setOrigin(0.5);
+    this.add.text(480, 360, 'thanks for playing! 🎃🥕', {
+      fontFamily: 'monospace', fontSize: '18px', color: '#9fb3c8',
+    }).setOrigin(0.5);
   }
 }
