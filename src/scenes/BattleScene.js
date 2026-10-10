@@ -327,9 +327,10 @@ export default class BattleScene extends Phaser.Scene {
     // Container anchored at bottom-middle: (0,0) is the body's bottom-center,
     // so tweens scale/bob from the feet.
     const container = this.add.container(0, 0);
-    const legR = this.add.image(-55, -60, 'skitterbug-leg-r').setOrigin(0, 0); // our left, behind
+    // Legs have their bottoms on the ground (container y=0); body sits on top.
+    const legR = this.add.image(-60, -37, 'skitterbug-leg-r').setOrigin(0, 0); // our left, behind
     const body = this.add.image(0, 0, 'skitterbug-body2').setOrigin(0.5, 1);
-    const legL = this.add.image(24, -70, 'skitterbug-leg-l').setOrigin(0, 0);  // our right, in front
+    const legL = this.add.image(15, -52, 'skitterbug-leg-l').setOrigin(0, 0);  // our right, in front
     container.add([legR, body, legL]);
     container.setData('fitMax', AUTOSCALE.skitterbug ?? FIT_MAX);
     this.placeFighter(container, col, row, SKITTER_MANUAL);
@@ -340,6 +341,7 @@ export default class BattleScene extends Phaser.Scene {
       moveIntent: Math.random() < 0.5 ? -1 : 1, // -1 = up, 1 = down
       canSpit: false, // starts with a move (move, spit, move, spit...)
       bobPhase: Math.random() * Math.PI * 2, // desync the idle bob
+      baseScaleX: container.scaleX, baseScaleY: container.scaleY, // for the squash bob
       shootAnim: false, // true while the shoot tween is playing
       hpBar: this.makeHpBar(),
     };
@@ -1392,10 +1394,10 @@ export default class BattleScene extends Phaser.Scene {
   // Otherwise move (up/down by intent). Can't spit twice without moving.
 
   skitterbugAI(e, time) {
-    // idle: bob the whole layered assembly up/down, anchored at bottom-middle
+    // idle: squash-and-stretch bob, anchored at bottom-middle so feet stay planted
     if (!e.sprite.getData('teleporting') && !e.shootAnim) {
-      const baseY = tileFeet(e.col, e.row).y;
-      e.sprite.y = baseY + Math.sin(time * 0.006 + e.bobPhase) * 5;
+      const squash = 1 + Math.sin(time * 0.006 + e.bobPhase) * 0.04;
+      e.sprite.setScale(e.baseScaleX, e.baseScaleY * squash);
     }
 
     if (time < e.nextCheck) return;
@@ -1436,8 +1438,7 @@ export default class BattleScene extends Phaser.Scene {
       targets: c, alpha: 0, duration: 100,
       onComplete: () => {
         this.placeFighter(c, e.col, e.row, SKITTER_MANUAL);
-        // reset bob so it doesn't snap
-        c.y = tileFeet(e.col, e.row).y;
+        e.baseScaleX = c.scaleX; e.baseScaleY = c.scaleY; // refresh after move
         this.tweens.add({
           targets: c, alpha: 1, duration: 100,
           onComplete: () => c.setData('teleporting', false),
@@ -1448,8 +1449,9 @@ export default class BattleScene extends Phaser.Scene {
 
   spitIchor(e) {
     // shoot animation: rear up (squash), then snap forward as the bullet fires
+    // anchored at bottom-middle (container origin), so feet stay planted
     const s = e.sprite;
-    const bx = s.scaleX, by = s.scaleY;
+    const bx = e.baseScaleX, by = e.baseScaleY;
     e.shootAnim = true;
     this.tweens.killTweensOf(s);
     this.tweens.add({
