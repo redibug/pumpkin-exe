@@ -222,8 +222,10 @@ export default class BattleScene extends Phaser.Scene {
   // MMBN-style custom: the gauge fills during battle, SHIFT opens this
   // screen (also auto-opens when the battle starts). Draw up to HAND_MAX
   // cards, pick up to LOADOUT_MAX for the 1-4 slots. Unpicked cards stay
-  // in hand for next time; C discards the hovered card. Confirming spends
-  // the old loadout to the discard pile and loads the new picks.
+  // in hand for next time; X marks a card for discard (red X, tossed on
+  // confirm). Confirming spends the old loadout to the discard pile and
+  // loads the new picks. OK/CANCEL are on-screen buttons, navigable with
+  // the arrows and clickable with the mouse.
   openCustom() {
     if (this.customOpen || this.over || this.dialogue.isActive()) return;
     this.customOpen = true;
@@ -231,8 +233,9 @@ export default class BattleScene extends Phaser.Scene {
     this.updateCustomGaugeHud();
     this.setPaused(true);
     this.drawToHand();
-    this.customCursor = 0;
+    this.customCursor = { row: 0, col: 0 }; // row 0 = cards, row 1 = buttons
     this.customSelected = []; // hand indices, in selection order
+    this.customDiscard = []; // hand indices marked for discard (red X)
     this.buildCustomUI();
     this._customKeyHandler = (event) => this.handleCustomKey(event);
     this.input.keyboard.on('keydown', this._customKeyHandler);
@@ -250,22 +253,26 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   handleCustomKey(event) {
+    const cur = this.customCursor;
+    const rowLen = [this.hand.length, 2];
     switch (event.code) {
       case 'ArrowLeft':
-        this.customCursor = Math.max(0, this.customCursor - 1);
+        cur.col = Math.max(0, cur.col - 1);
         break;
       case 'ArrowRight':
-        this.customCursor = Math.min(this.hand.length - 1, this.customCursor + 1);
+        cur.col = Math.min(rowLen[cur.row] - 1, cur.col + 1);
+        break;
+      case 'ArrowUp':
+        if (cur.row === 1) { cur.row = 0; cur.col = Math.min(cur.col, this.hand.length - 1); }
+        break;
+      case 'ArrowDown':
+        if (cur.row === 0) { cur.row = 1; cur.col = Math.min(cur.col, 1); }
         break;
       case 'KeyZ':
-        this.toggleCustomSelect();
-        break;
-      case 'KeyX':
-      case 'Enter':
-        this.confirmCustom();
+        this.activateCustomCursor();
         return;
-      case 'KeyC':
-        this.discardCustomCard();
+      case 'KeyX':
+        if (cur.row === 0) this.toggleCustomDiscard();
         break;
       case 'Escape':
         this.cancelCustom();
@@ -273,37 +280,64 @@ export default class BattleScene extends Phaser.Scene {
       default:
         return;
     }
-    this.refreshCustomCards();
+    this.refreshCustom();
+  }
+
+  // Z: the generic "press" key — toggles a card, or pushes the hovered button
+  activateCustomCursor() {
+    const cur = this.customCursor;
+    if (cur.row === 0) {
+      this.toggleCustomSelect();
+      this.refreshCustom();
+    } else if (cur.col === 0) {
+      this.confirmCustom();
+    } else {
+      this.cancelCustom();
+    }
   }
 
   toggleCustomSelect() {
-    const i = this.customCursor;
+    const i = this.customCursor.col;
     if (i < 0 || i >= this.hand.length) return;
     const at = this.customSelected.indexOf(i);
-    if (at >= 0) this.customSelected.splice(at, 1);
-    else if (this.customSelected.length < LOADOUT_MAX) this.customSelected.push(i);
+    if (at >= 0) {
+      this.customSelected.splice(at, 1);
+    } else {
+      const m = this.customDiscard.indexOf(i); // selecting clears a discard mark
+      if (m >= 0) this.customDiscard.splice(m, 1);
+      if (this.customSelected.length < LOADOUT_MAX) this.customSelected.push(i);
+    }
   }
 
-  discardCustomCard() {
-    const i = this.customCursor;
+  // X: mark a card for discard (red X) — toggles; marking clears selection
+  toggleCustomDiscard() {
+    const i = this.customCursor.col;
     if (i < 0 || i >= this.hand.length) return;
-    const at = this.customSelected.indexOf(i);
-    if (at >= 0) this.customSelected.splice(at, 1);
-    this.customSelected = this.customSelected.map((s) => (s > i ? s - 1 : s));
-    this.discardPile.push(this.hand[i]);
-    this.hand.splice(i, 1);
-    this.customCursor = Math.min(this.customCursor, this.hand.length - 1);
+    const m = this.customDiscard.indexOf(i);
+    if (m >= 0) {
+      this.customDiscard.splice(m, 1);
+    } else {
+      const at = this.customSelected.indexOf(i);
+      if (at >= 0) this.customSelected.splice(at, 1);
+      this.customDiscard.push(i);
+    }
   }
 
   confirmCustom() {
-    if (this.customSelected.length === 0) { this.closeCustomUI(); return; } // nothing picked: keep loadout
+    if (this.customSelected.length === 0 && this.customDiscard.length === 0) {
+      this.closeCustomUI(); // nothing picked or marked: keep loadout
+      return;
+    }
     const picked = this.customSelected.map((i) => this.hand[i]); // selection order
-    // old loadout is spent
+    const tossed = this.customDiscard.map((i) => this.hand[i]);
+    // old loadout is spent, marked cards are tossed
     this.loadout.forEach((id) => { if (id) this.discardPile.push(id); });
+    tossed.forEach((id) => this.discardPile.push(id));
     this.loadout = [null, null, null, null];
     picked.forEach((id, s) => { this.loadout[s] = id; });
-    // picked cards leave the hand
-    [...this.customSelected].sort((a, b) => b - a).forEach((i) => this.hand.splice(i, 1));
+    // picked + tossed cards leave the hand
+    const gone = new Set([...this.customSelected, ...this.customDiscard]);
+    [...gone].sort((a, b) => b - a).forEach((i) => this.hand.splice(i, 1));
     this.updateLoadoutHud();
     this.closeCustomUI();
   }
@@ -334,10 +368,45 @@ export default class BattleScene extends Phaser.Scene {
     ui.add(this.customCountsText);
     this.customCardLayer = this.add.container(0, 0);
     ui.add(this.customCardLayer);
-    ui.add(this.add.text(480, 472, '←/→ move · Z select · X confirm · C discard · ESC cancel', {
+    this.customButtonLayer = this.add.container(0, 0);
+    ui.add(this.customButtonLayer);
+    ui.add(this.add.text(480, 472, 'arrows: move · Z: select/press · X: mark discard · mouse: click · ESC: cancel', {
       fontFamily: 'monospace', fontSize: '14px', color: '#9fb3c8',
     }).setOrigin(0.5));
+    this.refreshCustom();
+  }
+
+  refreshCustom() {
     this.refreshCustomCards();
+    this.refreshCustomButtons();
+  }
+
+  refreshCustomButtons() {
+    this.customButtonLayer.removeAll(true);
+    const defs = [
+      { name: 'OK', color: 0x00e5ff },
+      { name: 'CANCEL', color: 0x9fb3c8 },
+    ];
+    defs.forEach((def, bi) => {
+      const x = bi === 0 ? 408 : 552, y = 420;
+      const isCursor = this.customCursor.row === 1 && this.customCursor.col === bi;
+      const bg = this.add.rectangle(x, y, 130, 44, 0x0d1526)
+        .setStrokeStyle(2, isCursor ? 0xffffff : def.color);
+      bg.setInteractive({ useHandCursor: true });
+      bg.on('pointerover', () => {
+        this.customCursor = { row: 1, col: bi };
+        this.refreshCustom();
+      });
+      bg.on('pointerdown', () => {
+        if (bi === 0) this.confirmCustom();
+        else this.cancelCustom();
+      });
+      const label = this.add.text(x, y, def.name, {
+        fontFamily: 'monospace', fontSize: '18px',
+        color: isCursor ? '#ffffff' : '#e8f6ff',
+      }).setOrigin(0.5);
+      this.customButtonLayer.add([bg, label]);
+    });
   }
 
   refreshCustomCards() {
@@ -349,11 +418,22 @@ export default class BattleScene extends Phaser.Scene {
       const chip = CHIP_MAP[chipId];
       const card = this.add.container(x0 + i * (cw + gap), 300);
       const selIdx = this.customSelected.indexOf(i);
-      const isCursor = i === this.customCursor;
-      card.add(this.add.rectangle(0, 0, cw, ch, 0x0d1526).setStrokeStyle(
-        selIdx >= 0 ? 4 : 2,
-        selIdx >= 0 ? 0x00e5ff : (isCursor ? 0xffffff : 0x334155),
-      ));
+      const marked = this.customDiscard.includes(i);
+      const isCursor = this.customCursor.row === 0 && this.customCursor.col === i;
+      const border = selIdx >= 0 ? 0x00e5ff : marked ? 0xff3b30 : isCursor ? 0xffffff : 0x334155;
+      const bg = this.add.rectangle(0, 0, cw, ch, 0x0d1526)
+        .setStrokeStyle(selIdx >= 0 ? 4 : 2, border);
+      bg.setInteractive({ useHandCursor: true });
+      bg.on('pointerover', () => {
+        this.customCursor = { row: 0, col: i };
+        this.refreshCustom();
+      });
+      bg.on('pointerdown', () => {
+        this.customCursor = { row: 0, col: i };
+        this.toggleCustomSelect();
+        this.refreshCustom();
+      });
+      card.add(bg);
       card.add(this.add.image(0, -40, `chip-${chipId}`).setDisplaySize(56, 56));
       card.add(this.add.text(0, 12, chip.name, {
         fontFamily: 'monospace', fontSize: '16px', color: '#e8f6ff',
@@ -367,10 +447,18 @@ export default class BattleScene extends Phaser.Scene {
           fontFamily: 'monospace', fontSize: '18px', color: '#00e5ff',
         }).setOrigin(0.5));
       }
+      if (marked) {
+        // red highlight + red X: tossed to the discard pile on confirm
+        card.add(this.add.rectangle(0, 0, cw, ch, 0xff3b30, 0.16));
+        const m = 36;
+        card.add(this.add.line(0, 0, -m, -m, m, m, 0xff3b30).setLineWidth(7));
+        card.add(this.add.line(0, 0, m, -m, -m, m, 0xff3b30).setLineWidth(7));
+      }
       this.customCardLayer.add(card);
     });
     this.customCountsText.setText(
-      `deck: ${this.deck.length}   discard: ${this.discardPile.length}   selected: ${this.customSelected.length}/${LOADOUT_MAX}`,
+      `deck: ${this.deck.length}   discard: ${this.discardPile.length}` +
+      `   selected: ${this.customSelected.length}/${LOADOUT_MAX}   marked: ${this.customDiscard.length}`,
     );
   }
 
