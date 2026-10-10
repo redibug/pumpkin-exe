@@ -916,11 +916,15 @@ export default class BattleScene extends Phaser.Scene {
     const dispW = bounds.width, dispH = bounds.height;
     const cols = Phaser.Math.Clamp(Math.round(dispW / TARGET_PX), 3, 30);
     const rows = Phaser.Math.Clamp(Math.round(dispH / TARGET_PX), 3, 30);
-    const cw = Math.ceil(fw / cols), ch = Math.ceil(fh / rows);
+    // Exact fractional source size; canvas uses rounded integers, and the
+    // image scale is adjusted to compensate so chunks tile exactly.
+    const cwSrc = fw / cols, chSrc = fh / rows;
+    const cw = Math.max(1, Math.round(cwSrc)), ch = Math.max(1, Math.round(chSrc));
     const chunkW = dispW / cols, chunkH = dispH / rows;
+    const adjX = cwSrc / cw, adjY = chSrc / ch; // scale correction
     const key = sprite.texture.key;
     const depth = sprite.depth;
-    const scaleX = sprite.scaleX, scaleY = sprite.scaleY;
+    const scaleX = sprite.scaleX * adjX, scaleY = sprite.scaleY * adjY;
     const srcImg = sprite.texture.getSourceImage();
 
     sprite.setVisible(false);
@@ -934,7 +938,7 @@ export default class BattleScene extends Phaser.Scene {
         const tex = this.textures.createCanvas(ck, cw, ch);
         const ctx = tex.getContext();
         ctx.clearRect(0, 0, cw, ch);
-        ctx.drawImage(srcImg, c * cw, r * ch, cw, ch, 0, 0, cw, ch);
+        ctx.drawImage(srcImg, c * cwSrc, r * chSrc, cwSrc, chSrc, 0, 0, cw, ch);
         tex.refresh();
 
         const cx = bounds.x + (c + 0.5) * chunkW;
