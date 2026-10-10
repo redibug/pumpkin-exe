@@ -405,9 +405,10 @@ export default class BattleScene extends Phaser.Scene {
     sprite.setOrigin(0.75, 1);
     this.placeFighter(sprite, col, row, SENTRY_MANUAL);
     // sensor light: red dot at the indicator on the sprite (74.5% from
-    // left, 43.8% from top); flashes when activated
+    // left, 43.8% from top); flashes when activated.
+    // Origin is (0.75, 1), so offset from sprite.x/y accordingly.
     const sensor = this.add.circle(
-      sprite.x + (0.7449 - 0.5) * sprite.displayWidth,
+      sprite.x + (0.7449 - 0.75) * sprite.displayWidth,
       sprite.y + (0.4375 - 1.0) * sprite.displayHeight,
       7, 0xff3b30
     );
@@ -912,7 +913,8 @@ export default class BattleScene extends Phaser.Scene {
     const rows = Phaser.Math.Clamp(Math.round(dispH / TARGET_PX), 3, 30);
     const cw = Math.ceil(fw / cols), ch = Math.ceil(fh / rows);
     const chunkW = dispW / cols, chunkH = dispH / rows;
-    const ox = sprite.x, oy = sprite.y; // bottom-center (origin 0.5,1)
+    const ox = sprite.x, oy = sprite.y;
+    const oX = sprite.originX ?? 0.5, oY = sprite.originY ?? 1; // e.g. sentry uses (0.75, 1)
     const key = sprite.texture.key;
     const depth = sprite.depth;
     const scaleX = sprite.scaleX, scaleY = sprite.scaleY;
@@ -932,8 +934,8 @@ export default class BattleScene extends Phaser.Scene {
         ctx.drawImage(srcImg, c * cw, r * ch, cw, ch, 0, 0, cw, ch);
         tex.refresh();
 
-        const cx = ox - dispW / 2 + (c + 0.5) * chunkW;
-        const cy = oy - dispH + (r + 0.5) * chunkH;
+        const cx = ox - oX * dispW + (c + 0.5) * chunkW;
+        const cy = oy - oY * dispH + (r + 0.5) * chunkH;
         const img = this.add.image(cx, cy, ck);
         img.setOrigin(0.5, 0.5).setScale(scaleX, scaleY).setDepth(depth + 1);
 
@@ -1622,8 +1624,9 @@ export default class BattleScene extends Phaser.Scene {
       onComplete: () => { if (s.active) s.setX(baseX); },
     });
 
-    // red beam from the cannon muzzle (left edge, 33.9% from top) leftwards
-    const mx = s.x + (0.0 - 0.5) * s.displayWidth;
+    // red beam from the cannon muzzle (left edge, 33.9% from top) leftwards.
+    // Origin is (0.75, 1).
+    const mx = s.x + (0.0 - 0.75) * s.displayWidth;
     const my = s.y + (0.3390 - 1.0) * s.displayHeight;
     const beam = this.add.line(0, 0, 30, my, mx, my, 0xff3b30).setOrigin(0, 0);
     beam.setLineWidth(6).setAlpha(0.95);
