@@ -8,7 +8,7 @@ export const CHIPS = [
   { id: 'spread',  name: 'Spread',  damage: 25, cooldownMs: 3500, color: 0xba68c8, desc: 'Hits the target row and the rows above/below.' },
   { id: 'recover', name: 'Recover', damage: 0,  cooldownMs: 9000, color: 0x81c784, desc: 'Restores 60 HP to the navi.' },
   { id: 'railgun', name: 'Railgun', damage: 50, cooldownMs: 5000, color: 0x00e5ff, desc: 'Piercing hitscan blast down the entire row.' },
-  { id: 'rapid',   name: 'Rapid Fire', damage: 8, shots: 10, cooldownMs: 0, color: 0xffeb3b, desc: 'Hold to fire 10 weak shots.' },
+  { id: 'rapid',   name: 'Rapid Fire', damage: 8, shots: 10, fireIntervalMs: 130, cooldownMs: 0, color: 0xffeb3b, desc: 'Hold to fire 10 weak shots.' },
 ];
 
 export const CHIP_MAP = Object.fromEntries(CHIPS.map((c) => [c.id, c]));

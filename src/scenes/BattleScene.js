@@ -1330,20 +1330,28 @@ export default class BattleScene extends Phaser.Scene {
 
   fireRapidShot(slot) {
     const chip = CHIP_MAP.rapid;
-    // one weak, fast projectile down the navi's row
+    // hitscan like the buster: instant beam, hits first enemy ahead on the row
     const row = this.naviPos.row;
-    const feet = tileFeet(this.naviPos.col, this.naviPos.row);
-    const proj = this.add.circle(feet.x + 30, tileCenter(0, row).y, 6, chip.color);
-    proj.setDepth(10 + row);
-    proj.setData('damage', chip.damage);
-    proj.setData('row', row);
-    proj.setData('vx', 750);
-    this.projectiles.add(proj);
-    // small muzzle flash
-    this.showMuzzleFlash(feet.x + 45 * this.navi.scaleX, feet.y - 115 * this.navi.scaleX, row);
+    const s = this.navi.scaleX;
+    const mx = this.navi.x + 45 * s, my = this.navi.y - 115 * s;
+    this.showMuzzleFlash(mx, my, row);
+    let target = null, targetCol = 99;
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      if (e.type === 'mandrake' && e.state !== 'emerged') continue;
+      if (e.row === row && e.col > this.naviPos.col && e.col < targetCol) {
+        target = e; targetCol = e.col;
+      }
+    }
+    const endX = target ? tileCenter(targetCol, row).x : 930;
+    const beam = this.add.line(0, 0, mx, my, endX, my, chip.color).setOrigin(0, 0);
+    beam.setLineWidth(2).setAlpha(0.8);
+    beam.setDepth(10 + row);
+    this.tweens.add({ targets: beam, alpha: 0, duration: 90, onComplete: () => beam.destroy() });
+    if (target) { this.damageEnemy(target, chip.damage); this.flash(target.sprite, chip.color); }
 
     this.chipAmmo[slot]--;
-    this.rapidNextShot = this.time.now + 130; // ~7.7 shots/sec
+    this.rapidNextShot = this.time.now + (chip.fireIntervalMs ?? 130);
 
     if (this.chipAmmo[slot] <= 0) {
       // out of ammo: remove the chip, slide the rest left
