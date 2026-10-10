@@ -330,6 +330,8 @@ export default class BattleScene extends Phaser.Scene {
       nextCheck: 0,
       moveIntent: Math.random() < 0.5 ? -1 : 1, // -1 = up, 1 = down
       canSpit: false, // starts with a move (move, spit, move, spit...)
+      phase: Math.random() * Math.PI * 2, // idle bob phase
+      shootAnim: false, // true while the shoot tween is playing
       hpBar: this.makeHpBar(),
     };
     this.enemies.push(enemy);
@@ -1379,6 +1381,12 @@ export default class BattleScene extends Phaser.Scene {
   // Otherwise move (up/down by intent). Can't spit twice without moving.
 
   skitterbugAI(e, time) {
+    // idle animation: gentle bob (skipped while teleporting or shooting)
+    if (!e.sprite.getData('teleporting') && !e.shootAnim) {
+      const p = tileFeet(e.col, e.row);
+      e.sprite.y = p.y + Math.sin(time * 0.004 + e.phase) * 2.5;
+    }
+
     if (time < e.nextCheck) return;
     e.nextCheck = time + SKITTER.checkIntervalMs;
 
@@ -1406,6 +1414,37 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   spitIchor(e) {
+    // shoot animation: rear up (squash), then snap forward as the bullet fires
+    const s = e.sprite;
+    const bx = s.scaleX, by = s.scaleY;
+    e.shootAnim = true;
+    this.tweens.killTweensOf(s);
+    this.tweens.add({
+      targets: s,
+      scaleX: bx * 0.9,
+      scaleY: by * 1.12,
+      duration: 90,
+      ease: 'Quad.easeIn',
+      onComplete: () => {
+        // fire!
+        this.tweens.add({
+          targets: s,
+          scaleX: bx * 1.12,
+          scaleY: by * 0.9,
+          duration: 70,
+          ease: 'Quad.easeOut',
+          yoyo: true,
+          onComplete: () => {
+            s.setScale(bx, by);
+            e.shootAnim = false;
+          },
+        });
+        this.spawnIchorBullet(e);
+      },
+    });
+  }
+
+  spawnIchorBullet(e) {
     const p = tileCenter(e.col, e.row);
     const bullet = this.add.circle(p.x - 20, p.y, 8, SKITTER.bulletColor);
     bullet.setDepth(10 + e.row);
@@ -1446,6 +1485,7 @@ export default class BattleScene extends Phaser.Scene {
       e.alive = false;
       if (e.warnRect) { e.warnRect.destroy(); e.warnRect = null; }
       if (e.mound) e.mound.setVisible(false);
+      this.tweens.killTweensOf(e.sprite); // stop idle/shoot tweens
       const s0 = e.sprite.scaleX;
       const grow = e.type === 'pumpkin' ? 1.2 : 1.45;
       this.tweens.add({ targets: e.sprite, alpha: 0, scaleX: s0 * grow, scaleY: s0 * grow,
