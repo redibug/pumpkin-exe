@@ -240,6 +240,7 @@ export default class BattleScene extends Phaser.Scene {
     this.navi.play('bugchan-idle');
     this.navi.setOrigin(0.5, 1); // feet at the tile: she stands ON it
     this.placeFighter(this.navi, this.naviPos.col, this.naviPos.row, NAVI_MANUAL);
+    this.naviShadow = this.makeBlobShadow(this.navi);
 
     // spawn this battle's enemies from the config
     const battle = BATTLES[this.battleIndex];
@@ -328,6 +329,7 @@ export default class BattleScene extends Phaser.Scene {
       hp: BOSS.maxHp, maxHp: BOSS.maxHp, alive: true,
       nextMove: 0, nextAttack: 0,
       hpBar: this.makeHpBar(),
+      shadow: this.makeBlobShadow(sprite),
     };
     this.enemies.push(enemy);
     return enemy;
@@ -350,6 +352,7 @@ export default class BattleScene extends Phaser.Scene {
       state: 'burrowed', // burrowed | telegraph | emerged
       timer: 0, warnRect: null,
       hpBar: this.makeHpBar(),
+      shadow: this.makeBlobShadow(sprite),
     };
     this.enemies.push(enemy);
     return enemy;
@@ -368,6 +371,7 @@ export default class BattleScene extends Phaser.Scene {
       canSpit: false, // starts with a move (move, spit, move, spit...)
       shootAnim: false, // true while the shoot tween is playing
       hpBar: this.makeHpBar(),
+      shadow: this.makeBlobShadow(sprite),
     };
     // Idle bob as an INFINITE tween (keeps playing during pause, per the
     // standing rule). Squash-and-stretch on SCALE, not y — the sprite is
@@ -421,6 +425,7 @@ export default class BattleScene extends Phaser.Scene {
       cooldownUntil: 0,
       hpBar: this.makeHpBar(),
       baseX: sprite.x, baseY: sprite.y, // home position (for kickback reset)
+      shadow: this.makeBlobShadow(sprite),
     };
     this.enemies.push(enemy);
     return enemy;
@@ -1066,6 +1071,31 @@ export default class BattleScene extends Phaser.Scene {
     sprite.setDepth(10 + r);
   }
 
+  // Blob shadow: semi-translucent squished ellipse on the tile, marks exactly
+  // which tile the fighter stands on (reduces positional uncertainty).
+  makeBlobShadow(sprite) {
+    const w = Math.max(sprite.displayWidth * 0.75, 40);
+    const shadow = this.add.ellipse(sprite.x, sprite.y + 4, w, w * 0.28, 0x000000, 0.35);
+    shadow.setDepth(sprite.depth - 0.5);
+    return shadow;
+  }
+
+  syncShadows() {
+    // navi
+    if (this.naviShadow) {
+      this.naviShadow.setPosition(this.navi.x, this.navi.y + 4);
+      this.naviShadow.setDepth(this.navi.depth - 0.5);
+      this.naviShadow.setVisible(this.navi.visible);
+    }
+    // enemies
+    for (const e of this.enemies) {
+      if (!e.shadow) continue;
+      e.shadow.setPosition(e.sprite.x, e.sprite.y + 4);
+      e.shadow.setDepth(e.sprite.depth - 0.5);
+      e.shadow.setVisible(e.sprite.visible && e.alive);
+    }
+  }
+
   // Translucent perspective highlight over a tile (telegraphs, sword arc).
   // Floor-level: always below the characters.
   highlightTile(c, r, color, alpha = 0.4) {
@@ -1236,6 +1266,7 @@ export default class BattleScene extends Phaser.Scene {
     this.updateEnemies(time);
     for (const e of this.enemies) this.updateHpBar(e);
     this.updateHud(time);
+    this.syncShadows();
     this.checkEnd();
   }
 
@@ -1746,6 +1777,8 @@ export default class BattleScene extends Phaser.Scene {
       }
       // reset to home position (e.g. sentry kickback) so dissolve aligns
       if (e.baseX !== undefined) e.sprite.setPosition(e.baseX, e.baseY);
+      // hide the blob shadow
+      if (e.shadow) e.shadow.setVisible(false);
       // dissolve top-to-bottom (replaces the old grow+fade)
       this.dissolveSprite(e.sprite);
       this.updateHpBar(e); // hides the bar
@@ -1775,6 +1808,7 @@ export default class BattleScene extends Phaser.Scene {
     if (this.naviHp <= 0) {
       // Bugchan gets the delete animation too
       this.tweens.killTweensOf(this.navi);
+      if (this.naviShadow) this.naviShadow.setVisible(false);
       this.dissolveSprite(this.navi);
       this.startDialogue(SCRIPTS.defeat, () => this.showGameOver());
       return;
