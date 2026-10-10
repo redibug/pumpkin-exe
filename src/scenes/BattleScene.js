@@ -891,11 +891,12 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   // Dissolve a sprite into square pixel chunks when it's deleted. The chunk
-  // size adapts to the sprite's on-screen dimensions (target ~8px per chunk),
-  // so big sprites dissolve finer and small sprites coarser. Chunks wipe
-  // top-to-bottom with randomness, flickering at the frontier.
+  // size adapts to the sprite's on-screen dimensions (target ~8px per chunk).
+  // Animation: chunks start at their original positions (intact sprite), then
+  // lerp outward to scattered positions top-to-bottom, then get deleted
+  // top-to-bottom with a flicker.
   dissolveSprite(sprite, onDone) {
-    const DURATION = 500;
+    const DURATION = 700;
     const TARGET_PX = 8; // target on-screen chunk size
 
     const frame = sprite.frame;
@@ -920,8 +921,17 @@ export default class BattleScene extends Phaser.Scene {
         const img = this.add.image(ox + lx, oy + ly, key, frameName);
         img.setOrigin(0.5, 0.5).setScale(scaleX, scaleY).setDepth(depth + 1);
         img.setCrop(c * cw, r * ch, cw, ch);
-        // dissolve time: top rows first, plus randomness for the pixel look
-        chunks.push({ img, dissolveAt: (r / rows) * 0.65 + Math.random() * 0.35 });
+        // scatter outward (biased up), top rows first
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 10 + Math.random() * 18;
+        const scatterAt = (r / rows) * 0.45 + Math.random() * 0.15;
+        const dissolveAt = scatterAt + 0.2 + Math.random() * 0.2;
+        chunks.push({
+          img, ox: img.x, oy: img.y,
+          dx: Math.cos(angle) * dist,
+          dy: Math.sin(angle) * dist - 12, // bias upward
+          scatterAt, dissolveAt,
+        });
       }
     }
 
@@ -933,13 +943,22 @@ export default class BattleScene extends Phaser.Scene {
       ease: 'Quad.easeIn',
       onUpdate: () => {
         for (const ch of chunks) {
-          const d = ch.dissolveAt - progress.t;
-          if (d <= 0) {
-            ch.img.setVisible(false);
-          } else if (d < 0.07) {
-            ch.img.setVisible(Math.random() > 0.5); // flicker at the frontier
-          } else {
+          if (progress.t < ch.scatterAt) {
+            // intact
+            ch.img.setPosition(ch.ox, ch.oy);
+            ch.img.setAlpha(1);
             ch.img.setVisible(true);
+          } else if (progress.t < ch.dissolveAt) {
+            // scattering: lerp to offset
+            const k = (progress.t - ch.scatterAt) / (ch.dissolveAt - ch.scatterAt);
+            const e = k * k; // accelerate outward
+            ch.img.setPosition(ch.ox + ch.dx * e, ch.oy + ch.dy * e);
+            ch.img.setAlpha(1 - e * 0.4);
+            ch.img.setVisible(true);
+          } else {
+            // deleting: brief flicker then gone
+            const d = progress.t - ch.dissolveAt;
+            ch.img.setVisible(d < 0.06 && Math.random() > 0.5);
           }
         }
       },
