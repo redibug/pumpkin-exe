@@ -11,6 +11,16 @@ import { DialogueUI, SCRIPTS } from '../systems/dialogue.js';
 
 const M = RUTABAGA_MANDRAKE;
 
+// Skitterbug tuning (Mel: edit freely)
+const SKITTER = {
+  maxHp: 60,
+  moveIntervalMs: 2200,   // how often it scurries up/down a row
+  spitIntervalMs: 3200,   // how often it spits an ichor bullet
+  bulletSpeed: 170,       // slow-moving ichor (chips fly at 520)
+  bulletDamage: 10,
+  bulletColor: 0x9dbb2e,  // sickly yellow-green ichor
+};
+
 // ---- battles ----
 // Mel: edit freely — enemy comps, names, dialogue. Simple words, short lines.
 const BATTLES = [
@@ -128,6 +138,7 @@ export default class BattleScene extends Phaser.Scene {
     this.naviHp = 100; this.naviMaxHp = 100;
     this.naviPos = { col: 1, row: 1 };
     this.projectiles = this.add.group(); // tile-based collision, no physics
+    this.enemyProjectiles = this.add.group(); // virus bullets (hurt the navi)
     this.shootReadyAt = 0; // buster hitscan fire rate gate
     this.enemies = []; // {type, sprite, col, row, hp, maxHp, alive, ...}
     this.mandrakeGagged = false; // first-emerge gag plays once per battle
@@ -166,6 +177,7 @@ export default class BattleScene extends Phaser.Scene {
     for (const e of battle.enemies) {
       if (e.type === 'pumpkin') this.spawnPumpkin(e.col, e.row);
       else if (e.type === 'mandrake') this.spawnMandrake(e.col, e.row, e.big);
+      else if (e.type === 'skitterbug') this.spawnSkitterbug(e.col, e.row);
     }
     // NB: enemy AI timers are armed when the intro dialogue finishes, so
     // the battle doesn't run during the cutscene.
@@ -212,6 +224,9 @@ export default class BattleScene extends Phaser.Scene {
           e.nextAttack = now + 2200;
         } else if (e.type === 'mandrake') {
           e.timer = now + M.burrowedMs;
+        } else if (e.type === 'skitterbug') {
+          e.nextMove = now + 1200;
+          e.nextSpit = now + 2000;
         }
       }
       this.openCustom(); // MMBN-style: every battle starts at the custom screen
@@ -250,6 +265,31 @@ export default class BattleScene extends Phaser.Scene {
       hp: maxHp, maxHp, alive: true, big,
       state: 'burrowed', // burrowed | telegraph | emerged
       timer: 0, warnRect: null,
+      hpBar: this.makeHpBar(),
+    };
+    this.enemies.push(enemy);
+    return enemy;
+  }
+
+  spawnSkitterbug(col, row) {
+    // PLACEHOLDER visual: Mel to provide assets/sprites/virus-skitterbug.png.
+    // Generates a simple dark beetle blob texture until the real sprite lands.
+    if (!this.textures.exists('skitterbug-ph')) {
+      const g = this.make.graphics({ x: 0, y: 0 }, false);
+      g.fillStyle(0x2b1f16, 1).fillCircle(32, 32, 24);
+      g.fillStyle(0x9dbb2e, 1).fillCircle(22, 26, 5).fillCircle(42, 26, 5); // mandibles
+      g.lineStyle(3, 0x9dbb2e, 1).strokeCircle(32, 32, 24);
+      g.generateTexture('skitterbug-ph', 64, 64);
+      g.destroy();
+    }
+    const p = tileFeet(col, row);
+    const sprite = this.physics.add.sprite(p.x, p.y - 24 * p.s, 'skitterbug-ph');
+    sprite.setOrigin(0.5, 1);
+    this.placeFighter(sprite, col, row, 0.9);
+    const enemy = {
+      type: 'skitterbug', sprite, col, row,
+      hp: SKITTER.maxHp, maxHp: SKITTER.maxHp, alive: true,
+      nextMove: 0, nextSpit: 0,
       hpBar: this.makeHpBar(),
     };
     this.enemies.push(enemy);
@@ -305,7 +345,7 @@ export default class BattleScene extends Phaser.Scene {
     } else {
       const pausedMs = this.time.now - (this.pauseStart || this.time.now);
       for (const e of this.enemies) {
-        for (const key of ['nextMove', 'nextAttack', 'timer']) {
+        for (const key of ['nextMove', 'nextAttack', 'nextSpit', 'timer']) {
           if (Number.isFinite(e[key])) e[key] += pausedMs;
         }
       }
@@ -864,6 +904,7 @@ export default class BattleScene extends Phaser.Scene {
     this.handleMovement(time);
     this.handleChips(time);
     this.updateProjectiles(delta);
+    this.updateEnemyProjectiles(delta);
     this.updateEnemies(time);
     for (const e of this.enemies) this.updateHpBar(e);
     this.updateHud(time);
@@ -1063,6 +1104,7 @@ export default class BattleScene extends Phaser.Scene {
       if (!e.alive) continue;
       if (e.type === 'pumpkin') this.pumpkinAI(e, time);
       else if (e.type === 'mandrake') this.mandrakeAI(e, time);
+      else if (e.type === 'skitterbug') this.skitterbugAI(e, time);
     }
   }
 
@@ -1162,6 +1204,54 @@ export default class BattleScene extends Phaser.Scene {
       const np = tileFeet(md.col, md.row);
       md.mound.setPosition(np.x, np.y - 8).setVisible(true);
       md.mound.setDepth(9 + md.row).setScale(np.s);
+    }
+  }
+
+  // ================= skitterbug AI =================
+
+  skitterbugAI(e, time) {
+    // scurry up/down a row
+    if (time >= e.nextMove) {
+      e.nextMove = time + SKITTER.moveIntervalMs;
+      const dir = Math.random() < 0.5 ? -1 : 1;
+      const nr = Phaser.Math.Clamp(e.row + dir, 0, ROWS - 1);
+      if (nr !== e.row) {
+        const ox = e.sprite.x, oy = e.sprite.y;
+        e.row = nr;
+        this.placeFighter(e.sprite, e.col, e.row, 0.9); // new scale/depth
+        e.sprite.setPosition(ox, oy); // slide from the old spot
+        this.tweens.add({
+          targets: e.sprite, x: tileFeet(e.col, e.row).x, y: tileFeet(e.col, e.row).y,
+          duration: 200, ease: 'Quad.easeOut',
+        });
+      }
+    }
+    // spit a slow ichor bullet down its row
+    if (time >= e.nextSpit) {
+      e.nextSpit = time + SKITTER.spitIntervalMs;
+      const p = tileCenter(e.col, e.row);
+      const bullet = this.add.circle(p.x - 20, p.y, 8, SKITTER.bulletColor);
+      bullet.setDepth(10 + e.row);
+      bullet.setData('vx', -SKITTER.bulletSpeed);
+      bullet.setData('row', e.row);
+      this.enemyProjectiles.add(bullet);
+      // spit flash
+      this.tweens.add({ targets: bullet, scaleX: 1.4, scaleY: 1.4, duration: 120, yoyo: true });
+    }
+  }
+
+  updateEnemyProjectiles(delta) {
+    const dt = delta / 1000;
+    for (const b of [...this.enemyProjectiles.getChildren()]) {
+      if (!b.active) continue;
+      b.x += b.getData('vx') * dt;
+      if (b.x < -20) { b.destroy(); continue; }
+      // hits the navi if on her row and overlapping her tile
+      if (b.getData('row') === this.naviPos.row
+        && this.projOverlapsTile(b, this.naviPos.col, this.naviPos.row)) {
+        this.damageNavi(SKITTER.bulletDamage);
+        b.destroy();
+      }
     }
   }
 

@@ -4,12 +4,12 @@ Art direction: 16-bit pixel art, MMBN-style. Viruses read as malicious
 software given bodies — glitchy, carved, unnatural. Pumpkin motifs run
 through the roster (jam theme: PUMPKIN).
 
-## Stalker
-A gaunt, long-limbed hunter virus, matte black carapace with a carved
-jack-o'-lantern grin glowing amber across its chest. Its head is a single
-cyclopean eye on a ball joint that swivels independently to track the
-player's row. Moves with a twitchy, stop-motion skitter on needle-thin
-legs; freezes stock-still for a beat before firing.
+## Skitterbug
+A small beetle virus, low to the ground on six skittering legs, with a
+dark iridescent shell and glowing green mandibles. It never stays still,
+restlessly pacing up and down between rows. When it attacks, it rears up
+and spits a slow-moving glob of ichor — a sickly yellow-green bullet
+that drifts across its row toward the player.
 
 ## Sentry
 A squat, stationary turret virus rooted to its panel — a rusted iron
