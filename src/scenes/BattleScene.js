@@ -147,6 +147,9 @@ export default class BattleScene extends Phaser.Scene {
     this.load.image('boss', 'assets/sprites/viruses/boss-v5-cloak.png');
     this.load.image('mandrake', 'assets/sprites/viruses/virus-rutabaga-mandrake.png');
     this.load.image('skitterbug', 'assets/sprites/viruses/virus-skitterbug.png');
+    this.load.spritesheet('skitterbug-idle', 'assets/sprites/viruses/skitterbug-idle-strip.png', {
+      frameWidth: 120, frameHeight: 120,
+    });
     this.load.image('bg', 'assets/tiles/bg-cyberspace.png');
     this.load.image('chip-cannon', 'assets/ui/chip-cannon.png');
     this.load.image('chip-sword', 'assets/ui/chip-sword.png');
@@ -197,6 +200,12 @@ export default class BattleScene extends Phaser.Scene {
       key: 'bugchan-idle',
       frames: this.anims.generateFrameNumbers('bugchan', { start: 0, end: 7 }),
       frameRate: 8,
+      repeat: -1,
+    });
+    this.anims.create({
+      key: 'skitterbug-idle',
+      frames: this.anims.generateFrameNumbers('skitterbug-idle', { start: 0, end: 5 }),
+      frameRate: 6,
       repeat: -1,
     });
 
@@ -320,7 +329,8 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   spawnSkitterbug(col, row) {
-    const sprite = this.physics.add.sprite(0, 0, 'skitterbug');
+    const sprite = this.physics.add.sprite(0, 0, 'skitterbug-idle', 0);
+    sprite.play('skitterbug-idle');
     sprite.setData('fitMax', AUTOSCALE.skitterbug ?? FIT_MAX);
     sprite.setOrigin(0.5, 1);
     this.placeFighter(sprite, col, row, SKITTER_MANUAL);
@@ -330,7 +340,6 @@ export default class BattleScene extends Phaser.Scene {
       nextCheck: 0,
       moveIntent: Math.random() < 0.5 ? -1 : 1, // -1 = up, 1 = down
       canSpit: false, // starts with a move (move, spit, move, spit...)
-      phase: Math.random() * Math.PI * 2, // idle bob phase
       shootAnim: false, // true while the shoot tween is playing
       hpBar: this.makeHpBar(),
     };
@@ -1381,12 +1390,7 @@ export default class BattleScene extends Phaser.Scene {
   // Otherwise move (up/down by intent). Can't spit twice without moving.
 
   skitterbugAI(e, time) {
-    // idle animation: gentle bob (skipped while teleporting or shooting)
-    if (!e.sprite.getData('teleporting') && !e.shootAnim) {
-      const p = tileFeet(e.col, e.row);
-      e.sprite.y = p.y + Math.sin(time * 0.004 + e.phase) * 2.5;
-    }
-
+    // idle is the sprite strip animation; shoot tween handles the rest
     if (time < e.nextCheck) return;
     e.nextCheck = time + SKITTER.checkIntervalMs;
 
