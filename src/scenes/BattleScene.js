@@ -1285,49 +1285,50 @@ export default class BattleScene extends Phaser.Scene {
   handleChips(time) {
     // X: buster shoot (hitscan). Z/Space: use the front chip. 1-4: chips out of order.
     if (Phaser.Input.Keyboard.JustDown(this.shootKey)) this.fireShoot(time);
-    // Rapid fire: keep firing while the key is held (started via JustDown below)
+    // Rapid fire: keep firing while the key is held (started via JustDown below).
+    // Uses the scene clock for timing to avoid stale `time` params.
     if (this.rapidFiring) {
       const { slot, key } = this.rapidFiring;
       if (!key.isDown || this.loadout[slot] !== 'rapid') {
         this.rapidFiring = null; // key released or chip gone
-      } else if (time >= this.rapidNextShot) {
-        this.fireRapidShot(slot, time);
+      } else if (this.time.now >= this.rapidNextShot) {
+        this.fireRapidShot(slot);
       }
     }
-    if (Phaser.Input.Keyboard.JustDown(this.chipFrontKey)
-      || Phaser.Input.Keyboard.JustDown(this.chipFrontKey2)) {
-      const k = Phaser.Input.Keyboard.JustDown(this.chipFrontKey) ? this.chipFrontKey : this.chipFrontKey2;
-      this.pressChipKey(0, k, time);
+    const frontDown = Phaser.Input.Keyboard.JustDown(this.chipFrontKey);
+    const front2Down = Phaser.Input.Keyboard.JustDown(this.chipFrontKey2);
+    if (frontDown || front2Down) {
+      this.pressChipKey(0, frontDown ? this.chipFrontKey : this.chipFrontKey2);
     }
     const keyMap = [this.keys.ONE, this.keys.TWO, this.keys.THREE, this.keys.FOUR];
     keyMap.forEach((key, i) => {
-      if (Phaser.Input.Keyboard.JustDown(key)) this.pressChipKey(i, key, time);
+      if (Phaser.Input.Keyboard.JustDown(key)) this.pressChipKey(i, key);
     });
   }
 
   // Called on JustDown of a chip key. Rapid fire starts a hold-to-fire;
   // other chips fire once via fireChipAt.
-  pressChipKey(i, key, time) {
+  pressChipKey(i, key) {
     const chipId = this.loadout[i];
     if (!chipId) return;
     if (chipId === 'rapid') {
       // don't restart if already firing this slot (e.g. pressing 1 while holding Z)
       if (this.rapidFiring && this.rapidFiring.slot === i) return;
-      this.startRapidFire(i, key, time);
+      this.startRapidFire(i, key);
     } else {
-      this.fireChipAt(i, time);
+      this.fireChipAt(i, this.time.now);
     }
   }
 
-  startRapidFire(slot, key, time) {
+  startRapidFire(slot, key) {
     if (this.chipAmmo[slot] == null) {
       this.chipAmmo[slot] = CHIP_MAP.rapid.shots; // 10
     }
     this.rapidFiring = { slot, key };
-    this.fireRapidShot(slot, time);
+    this.fireRapidShot(slot);
   }
 
-  fireRapidShot(slot, time) {
+  fireRapidShot(slot) {
     const chip = CHIP_MAP.rapid;
     // one weak, fast projectile down the navi's row
     const row = this.naviPos.row;
@@ -1342,7 +1343,7 @@ export default class BattleScene extends Phaser.Scene {
     this.showMuzzleFlash(feet.x + 45 * this.navi.scaleX, feet.y - 115 * this.navi.scaleX, row);
 
     this.chipAmmo[slot]--;
-    this.rapidNextShot = time + 130; // ~7.7 shots/sec
+    this.rapidNextShot = this.time.now + 130; // ~7.7 shots/sec
 
     if (this.chipAmmo[slot] <= 0) {
       // out of ammo: remove the chip, slide the rest left
