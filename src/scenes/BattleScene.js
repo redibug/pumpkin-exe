@@ -603,20 +603,20 @@ export default class BattleScene extends Phaser.Scene {
     // persistent chip cards (built once so select/mark can slide-tween)
     this.customCards = [];
     for (let i = 0; i < HAND_MAX; i++) {
-      const baseX = 70, baseY = 95 + i * 75;
+      const baseX = 72, baseY = 92 + i * 76;
       const root = this.add.container(baseX, baseY);
-      const halo = this.add.rectangle(0, 0, 68, 68, 0xffffff, 0.12)
+      const halo = this.add.rectangle(0, 0, 76, 76, 0xffffff, 0.12)
         .setStrokeStyle(2, 0xffffff).setVisible(false);
-      const frame = this.add.image(0, 0, 'chip-frame').setDisplaySize(56, 56);
-      const icon = this.add.image(0, -2, 'chip-empty').setDisplaySize(38, 38);
-      const selText = this.add.text(30, -30, '', {
-        fontFamily: 'monospace', fontSize: '16px', color: '#00e5ff',
+      const frame = this.add.image(0, 0, 'chip-frame').setDisplaySize(64, 64);
+      const icon = this.add.image(0, -3, 'chip-empty').setDisplaySize(36, 36);
+      const selText = this.add.text(-42, 0, '', {
+        fontFamily: 'monospace', fontSize: '18px', color: '#00e5ff',
       }).setOrigin(0.5).setVisible(false);
       // red X for marked (discard)
-      const m = 24;
+      const m = 26;
       const x1 = this.add.line(0, 0, -m, -m, m, m, 0xff3b30).setOrigin(0, 0).setLineWidth(6).setVisible(false);
       const x2 = this.add.line(0, 0, m, -m, -m, m, 0xff3b30).setOrigin(0, 0).setLineWidth(6).setVisible(false);
-      const tint = this.add.rectangle(0, 0, 56, 56, 0xff3b30, 0.15).setVisible(false);
+      const tint = this.add.rectangle(0, 0, 64, 64, 0xff3b30, 0.15).setVisible(false);
       root.add([halo, frame, icon, tint, x1, x2, selText]);
       frame.setInteractive({ useHandCursor: true });
       frame.on('pointerover', () => {
@@ -636,25 +636,25 @@ export default class BattleScene extends Phaser.Scene {
 
     // detail area: large art + name + desc of the highlighted chip.
     // The art fits dynamically within 160x160, preserving aspect ratio.
-    this.customDetailImage = this.add.image(255, 160, 'chip-empty');
+    this.customDetailImage = this.add.image(265, 150, 'chip-empty');
     this.fitImageToArea(this.customDetailImage, 160, 160);
-    this.customDetailName = this.add.text(255, 248, '', {
+    this.customDetailName = this.add.text(265, 245, '', {
       fontFamily: 'monospace', fontSize: '20px', color: '#e8f6ff',
     }).setOrigin(0.5);
-    this.customDetailDesc = this.add.text(255, 275, '', {
+    this.customDetailDesc = this.add.text(265, 272, '', {
       fontFamily: 'monospace', fontSize: '13px', color: '#9fb3c8',
-      wordWrap: { width: 200 }, align: 'center',
+      wordWrap: { width: 190 }, align: 'center',
     }).setOrigin(0.5, 0);
     ui.add([this.customDetailImage, this.customDetailName, this.customDetailDesc]);
 
-    this.customCountsText = this.add.text(200, 425, '', {
-      fontFamily: 'monospace', fontSize: '13px', color: '#9fb3c8',
+    this.customCountsText = this.add.text(110, 455, '', {
+      fontFamily: 'monospace', fontSize: '12px', color: '#9fb3c8',
     }).setOrigin(0.5);
     ui.add(this.customCountsText);
 
     // OK button
-    const okX = 200, okY = 462;
-    this.customOkBg = this.add.rectangle(okX, okY, 120, 40, 0x0d1526)
+    const okX = 270, okY = 455;
+    this.customOkBg = this.add.rectangle(okX, okY, 110, 36, 0x0d1526)
       .setStrokeStyle(2, 0x00e5ff);
     this.customOkBg.setInteractive({ useHandCursor: true });
     this.customOkBg.on('pointerover', () => {
@@ -670,8 +670,8 @@ export default class BattleScene extends Phaser.Scene {
     }).setOrigin(0.5);
     ui.add([this.customOkBg, this.customOkLabel]);
 
-    ui.add(this.add.text(200, 494, 'up/down: move · Z/click: select · X/right-click: discard', {
-      fontFamily: 'monospace', fontSize: '11px', color: '#9fb3c8',
+    ui.add(this.add.text(200, 490, 'up/down: move · Z/click: select · X/right-click: discard', {
+      fontFamily: 'monospace', fontSize: '10px', color: '#9fb3c8',
     }).setOrigin(0.5));
 
     this.refreshCustom();
@@ -705,7 +705,7 @@ export default class BattleScene extends Phaser.Scene {
         card.frame.setAlpha(1);
         card.icon.setVisible(true).setTexture(`chip-${chipId}-small`);
         card.halo.setVisible(isCursor);
-        card.selText.setVisible(selected).setText(selected ? `${selIdx + 1}` : '');
+        card.selText.setVisible(selected).setText(selected ? `${selIdx + 1}→` : '');
         card.tint.setVisible(marked);
         card.x1.setVisible(marked); card.x2.setVisible(marked);
         // slide: selected -> right, marked -> left
