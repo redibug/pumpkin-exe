@@ -167,6 +167,8 @@ export default class BattleScene extends Phaser.Scene {
 
   init(data) {
     this.battleIndex = data.battleIndex || 0;
+    // HP carries between battles (no heal); defaults to full on fresh start/retry
+    this._carriedHp = (typeof data.naviHp === 'number') ? data.naviHp : 100;
   }
 
   preload() {
@@ -199,7 +201,7 @@ export default class BattleScene extends Phaser.Scene {
     this.time.paused = false; // insurance: never boot a restart mid-pause
 
     // ---- state ----
-    this.naviHp = 100; this.naviMaxHp = 100;
+    this.naviHp = this._carriedHp; this.naviMaxHp = 100;
     this.naviPos = { col: 1, row: 1 };
     // per-battle start position (e.g. SENTRY POST starts bottom-left)
     const _battleCfg = BATTLES[this.battleIndex];
@@ -1781,7 +1783,8 @@ export default class BattleScene extends Phaser.Scene {
       this.input.keyboard.off('keydown', advance);
       this.startDialogue(battle.victory, () => {
         this.startDialogue(battle.story, () => {
-          this.scene.restart({ battleIndex: this.battleIndex + 1 });
+          // no heal between battles: carry current HP forward
+          this.scene.restart({ battleIndex: this.battleIndex + 1, naviHp: this.naviHp });
         });
       });
     };
