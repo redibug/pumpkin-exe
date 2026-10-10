@@ -13,6 +13,8 @@ export const CHARACTERS = {
   mel:      { name: 'Mel',           mugshot: null,           side: 'left',  color: '#e8f6ff' },
   pumpkin:  { name: 'PUMPKIN.EXE',   mugshot: 'mug-pumpkin',  side: 'right', color: '#ffb74d' },
   mandrake: { name: 'RUTABAGA.MND',  mugshot: 'mug-mandrake', side: 'right', color: '#ce93d8' },
+  skitterbug: { name: 'SKITTERBUG',  mugshot: null,           side: 'right', color: '#9dbb2e' },
+  sentry:   { name: 'SENTRY',        mugshot: null,           side: 'right', color: '#ff3b30' },
 };
 
 const CPS = 48; // teletype characters per second
