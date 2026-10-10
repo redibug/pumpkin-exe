@@ -1307,10 +1307,14 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   // Called on JustDown of a chip key. Rapid fire starts a hold-to-fire;
-  // other chips fire once via fireChipAt.
+  // other chips fire once via fireChipAt. Front key (Z/Space) with an empty
+  // slot falls back to the buster.
   pressChipKey(i, key) {
     const chipId = this.loadout[i];
-    if (!chipId) return;
+    if (!chipId) {
+      if (i === 0) this.fireShoot(this.time.now); // out of chips: buster
+      return;
+    }
     if (chipId === 'rapid') {
       // don't restart if already firing this slot (e.g. pressing 1 while holding Z)
       if (this.rapidFiring && this.rapidFiring.slot === i) return;
