@@ -404,11 +404,11 @@ export default class BattleScene extends Phaser.Scene {
     sprite.setData('fitMax', AUTOSCALE.sentry ?? FIT_MAX);
     sprite.setOrigin(0.5, 1);
     this.placeFighter(sprite, col, row, SENTRY_MANUAL);
-    // sensor light: red dot at the indicator on the sprite (74% from
-    // left, 28% from top); flashes when activated
+    // sensor light: red dot at the indicator on the sprite (74.5% from
+    // left, 43.8% from top); flashes when activated
     const sensor = this.add.circle(
-      sprite.x + (0.7421 - 0.5) * sprite.displayWidth,
-      sprite.y + (0.2796 - 1.0) * sprite.displayHeight,
+      sprite.x + (0.7449 - 0.5) * sprite.displayWidth,
+      sprite.y + (0.4375 - 1.0) * sprite.displayHeight,
       7, 0xff3b30
     );
     sensor.setDepth(sprite.depth + 1);
@@ -1622,9 +1622,9 @@ export default class BattleScene extends Phaser.Scene {
       onComplete: () => { if (s.active) s.setX(baseX); },
     });
 
-    // red beam from the cannon muzzle (13.6% from left, 26.3% from top) leftwards
-    const mx = s.x + (0.1357 - 0.5) * s.displayWidth;
-    const my = s.y + (0.2632 - 1.0) * s.displayHeight;
+    // red beam from the cannon muzzle (left edge, 33.9% from top) leftwards
+    const mx = s.x + (0.0 - 0.5) * s.displayWidth;
+    const my = s.y + (0.3390 - 1.0) * s.displayHeight;
     const beam = this.add.line(0, 0, 30, my, mx, my, 0xff3b30).setOrigin(0, 0);
     beam.setLineWidth(6).setAlpha(0.95);
     beam.setDepth(10 + e.row);
