@@ -633,7 +633,10 @@ export default class BattleScene extends Phaser.Scene {
     // custom gauge under the HP bar
     this.add.text(20, 514, 'CUSTOM', { fontFamily: 'monospace', fontSize: '12px', color: '#9fb3c8' });
     this.add.rectangle(120, 522, 220, 10, 0x101828).setOrigin(0, 0.5);
-    this.customGaugeFill = this.add.rectangle(122, 522, 0, 6, 0x00e5ff).setOrigin(0, 0.5);
+    // NB: created at full width — setDisplaySize divides by the current
+    // width, so a 0-width rect would scale to NaN and never render.
+    this.customGaugeFill = this.add.rectangle(122, 522, 216, 6, 0x00e5ff).setOrigin(0, 0.5);
+    this.customGaugeFill.setDisplaySize(0, 6);
     this.customReadyText = this.add.text(348, 514, 'SHIFT!', {
       fontFamily: 'monospace', fontSize: '14px', color: '#00e5ff',
     }).setVisible(false);
