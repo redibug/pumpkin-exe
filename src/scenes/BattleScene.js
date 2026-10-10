@@ -909,13 +909,13 @@ export default class BattleScene extends Phaser.Scene {
 
     const frame = sprite.frame;
     const fw = frame.width, fh = frame.height;
-    const dispW = sprite.displayWidth, dispH = sprite.displayHeight;
+    // Use the sprite's actual displayed bounds (accounts for origin, scale)
+    const bounds = sprite.getBounds();
+    const dispW = bounds.width, dispH = bounds.height;
     const cols = Phaser.Math.Clamp(Math.round(dispW / TARGET_PX), 3, 30);
     const rows = Phaser.Math.Clamp(Math.round(dispH / TARGET_PX), 3, 30);
     const cw = Math.ceil(fw / cols), ch = Math.ceil(fh / rows);
     const chunkW = dispW / cols, chunkH = dispH / rows;
-    const ox = sprite.x, oy = sprite.y;
-    const oX = sprite.originX ?? 0.5, oY = sprite.originY ?? 1; // e.g. sentry uses (0.75, 1)
     const key = sprite.texture.key;
     const depth = sprite.depth;
     const scaleX = sprite.scaleX, scaleY = sprite.scaleY;
@@ -935,8 +935,8 @@ export default class BattleScene extends Phaser.Scene {
         ctx.drawImage(srcImg, c * cw, r * ch, cw, ch, 0, 0, cw, ch);
         tex.refresh();
 
-        const cx = ox - oX * dispW + (c + 0.5) * chunkW;
-        const cy = oy - oY * dispH + (r + 0.5) * chunkH;
+        const cx = bounds.x + (c + 0.5) * chunkW;
+        const cy = bounds.y + (r + 0.5) * chunkH;
         const img = this.add.image(cx, cy, ck);
         img.setOrigin(0.5, 0.5).setScale(scaleX, scaleY).setDepth(depth + 1);
 
