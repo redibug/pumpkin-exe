@@ -140,6 +140,7 @@ export default class BattleScene extends Phaser.Scene {
     this.shootKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X); // buster
     this.chipFrontKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z); // front chip
     this.chipFrontKey2 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE); // front chip
+    this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER); // dialogue advance
     this.input.mouse.disableContextMenu(); // right-click discards in the custom screen
 
     // ---- collisions ----
@@ -231,7 +232,7 @@ export default class BattleScene extends Phaser.Scene {
   // confirm). Confirming spends the old loadout to the discard pile and
   // loads the new picks. OK is an on-screen button, navigable with the
   // arrows and clickable with the mouse (ESC still cancels).
-  openCustom() {
+  openCustom(skipKeyGuard = false) {
     if (this.customOpen || this.over || this.dialogue.isActive()) return;
     this.customOpen = true;
     this.customTimer = 0;
@@ -242,6 +243,13 @@ export default class BattleScene extends Phaser.Scene {
     this.customSelected = []; // hand indices, in selection order
     this.customDiscard = []; // hand indices marked for discard (red X)
     this.buildCustomUI();
+    // The keyboard plugin emits 'keydown-Z' BEFORE generic 'keydown'. If this
+    // screen was opened by Z/Space/Enter, our 'keydown' handler (registered
+    // during the 'keydown-X' dispatch) would fire for that SAME press and
+    // auto-select the first chip. Swallow that one emit.
+    const JustDown = Phaser.Input.Keyboard.JustDown;
+    this._swallowCustomKeydown = !skipKeyGuard &&
+      (JustDown(this.chipFrontKey) || JustDown(this.chipFrontKey2) || JustDown(this.enterKey));
     // Swallow the input that opened the screen: the opening click is still
     // being dispatched when the cards are created, so it would pass through
     // and "click" a card. Arm on pointer-up (or immediately if no pointer
@@ -249,7 +257,10 @@ export default class BattleScene extends Phaser.Scene {
     this.customArmed = !this.input.activePointer.isDown;
     this._customArmHandler = () => { this.customArmed = true; };
     this.input.once('pointerup', this._customArmHandler);
-    this._customKeyHandler = (event) => this.handleCustomKey(event);
+    this._customKeyHandler = (event) => {
+      if (this._swallowCustomKeydown) { this._swallowCustomKeydown = false; return; }
+      this.handleCustomKey(event);
+    };
     this.input.keyboard.on('keydown', this._customKeyHandler);
   }
 
@@ -723,7 +734,7 @@ export default class BattleScene extends Phaser.Scene {
       this.customTimer = Math.min(this.customTimer + delta, CUSTOM_GAUGE_MS);
       this.updateCustomGaugeHud();
     } else if (Phaser.Input.Keyboard.JustDown(this.customKey)) {
-      this.openCustom();
+      this.openCustom(true); // in scene update: no keydown dispatch in flight
     }
     this.handleMovement(time);
     // skip one frame of chip input after the custom screen closes, so the
