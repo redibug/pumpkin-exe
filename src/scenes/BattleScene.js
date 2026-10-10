@@ -1614,12 +1614,12 @@ export default class BattleScene extends Phaser.Scene {
 
   fireSentryLaser(e) {
     // Instant piercing hitscan (like the railgun chip, but firing left at
-    // the navi). Mouth splits open (squash) as it fires.
+    // the navi). Powerful kickback shoves the sentry right slightly.
     const s = e.sprite;
-    const bx = s.scaleX, by = s.scaleY;
+    const baseX = s.x;
     this.tweens.add({
-      targets: s, scaleX: bx * 1.1, scaleY: by * 0.85, duration: 80, yoyo: true,
-      onComplete: () => { if (s.active) s.setScale(bx, by); },
+      targets: s, x: baseX + 14, duration: 90, yoyo: true, ease: 'Quad.easeOut',
+      onComplete: () => { if (s.active) s.setX(baseX); },
     });
 
     // red beam from the cannon muzzle (left edge, 48.8% from top) leftwards
