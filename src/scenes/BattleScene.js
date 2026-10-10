@@ -62,7 +62,7 @@ export default class BattleScene extends Phaser.Scene {
     this.naviPos = { col: 1, row: 1 };
     this.bossHp = BOSS.maxHp;
     this.bossPos = { col: 4, row: 1 };
-    this.projectiles = this.physics.add.group();
+    this.projectiles = this.add.group(); // tile-based collision, no physics
     this.shootReadyAt = 0; // buster hitscan fire rate gate
 
     // ---- custom screen / deck state ----
@@ -141,18 +141,6 @@ export default class BattleScene extends Phaser.Scene {
     this.chipFrontKey2 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE); // front chip
     this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER); // dialogue advance
     this.input.mouse.disableContextMenu(); // right-click discards in the custom screen
-
-    // ---- collisions ----
-    this.physics.add.overlap(this.projectiles, this.boss, (boss, proj) => {
-      this.damageBoss(proj.getData('damage'));
-      proj.destroy();
-    });
-    this.physics.add.overlap(this.projectiles, this.mandrakeSprite, (spr, proj) => {
-      if (this.mandrake.alive && this.mandrake.state === 'emerged') {
-        this.damageMandrake(proj.getData('damage'));
-      }
-      proj.destroy();
-    });
 
     // ---- dialogue ----
     this.dialogue = new DialogueUI(this);
@@ -740,6 +728,7 @@ export default class BattleScene extends Phaser.Scene {
     }
     this.handleMovement(time);
     this.handleChips(time);
+    this.updateProjectiles(delta);
     this.bossAI(time);
     this.mandrakeAI(time);
     this.updateHud(time);
@@ -899,14 +888,42 @@ export default class BattleScene extends Phaser.Scene {
       : [this.naviPos.row];
     rows.forEach((r) => {
       const proj = this.add.circle(feet.x + 30, tileCenter(0, r).y, 10, chip.color);
-      proj.setDepth(20);
-      this.physics.add.existing(proj);
+      proj.setDepth(10 + r); // row-ordered like other effects
       proj.setData('damage', chip.damage);
+      proj.setData('row', r);
+      proj.setData('vx', 520);
       this.projectiles.add(proj);
-      // NB: velocity must be set AFTER group.add — adding to a physics
-      // group zeroes the body's velocity.
-      proj.body.setVelocityX(520);
     });
+  }
+
+  // Tile-based projectile collision (not sprite boxes): a projectile hits
+  // only if it's on the enemy's row and overlapping the enemy's tile.
+  projOverlapsTile(proj, col, row) {
+    if (proj.getData('row') !== row) return false;
+    const corners = tileCorners(col, row);
+    const xs = corners.map((p) => p.x);
+    const leftX = Math.min(...xs), rightX = Math.max(...xs);
+    const px = proj.x, rad = 10;
+    return px + rad >= leftX && px - rad <= rightX;
+  }
+
+  updateProjectiles(delta) {
+    const dt = delta / 1000;
+    for (const proj of [...this.projectiles.getChildren()]) {
+      if (!proj.active) continue;
+      proj.x += proj.getData('vx') * dt;
+      if (proj.x > 1020) { proj.destroy(); continue; }
+      if (this.bossHp > 0 && this.projOverlapsTile(proj, this.bossPos.col, this.bossPos.row)) {
+        this.damageBoss(proj.getData('damage'));
+        proj.destroy();
+        continue;
+      }
+      const md = this.mandrake;
+      if (md.alive && md.state === 'emerged' && this.projOverlapsTile(proj, md.pos.col, md.pos.row)) {
+        this.damageMandrake(proj.getData('damage'));
+        proj.destroy();
+      }
+    }
   }
 
   // ================= boss AI =================
