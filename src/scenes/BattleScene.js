@@ -28,13 +28,13 @@ const SENTRY = {
   cooldownMs: 1000,       // cooldown: can't do anything for 1s
   laserDamage: 15,
 };
-const SENTRY_MANUAL = 0.9;
+const SENTRY_MANUAL = 1;
 
 // Per-enemy-type auto-scale: longest texture side auto-shrinks to fit.
 // Unlisted types use the default FIT_MAX (512).
 const AUTOSCALE = {
   skitterbug: 120,
-  sentry: 140,
+  sentry: 240,
 };
 
 // ---- battles ----
