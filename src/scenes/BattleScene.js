@@ -892,14 +892,15 @@ export default class BattleScene extends Phaser.Scene {
 
   // Dissolve a sprite into pixel chunks when it's deleted. Chunks start at
   // their original positions (intact sprite), lerp outward top-to-bottom,
-  // then delete top-to-bottom with a flicker. Uses top-left origin with
-  // simple offset math for guaranteed alignment.
+  // then delete top-to-bottom with a flicker. Center origin (0.5, 0.5).
   dissolveSprite(sprite, onDone) {
     const DURATION = 700;
     const TARGET_PX = 10;
 
     const frame = sprite.frame;
     const fw = frame.width, fh = frame.height;
+    // Use the BASE scale (not the current squashed value) for chunk layout,
+    // so the 0.5 manual scale doesn't double the spacing.
     const scaleX = sprite.scaleX, scaleY = sprite.scaleY;
     const cols = Phaser.Math.Clamp(Math.round((fw * scaleX) / TARGET_PX), 3, 30);
     const rows = Phaser.Math.Clamp(Math.round((fh * scaleY) / TARGET_PX), 3, 30);
@@ -913,15 +914,11 @@ export default class BattleScene extends Phaser.Scene {
     const chunks = [];
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
-        const img = this.add.image(0, 0, key);
-        // top-left origin: chunk's top-left in sprite-local coords
-        // (sprite origin 0.5,1 => local (0,0) is bottom-center at (ox,oy))
-        const localX = c * cw - fw / 2;
-        const localY = r * ch - fh;
-        img.setOrigin(0, 0);
-        img.setPosition(ox + localX * scaleX, oy + localY * scaleY);
-        img.setScale(scaleX, scaleY);
-        img.setDepth(depth + 1);
+        // chunk center in sprite-local coords (origin 0.5,1 => bottom-center at 0,0)
+        const lx = (c * cw + cw / 2 - fw / 2) * scaleX;
+        const ly = (r * ch + ch / 2 - fh) * scaleY;
+        const img = this.add.image(ox + lx, oy + ly, key);
+        img.setOrigin(0.5, 0.5).setScale(scaleX, scaleY).setDepth(depth + 1);
         img.setCrop(c * cw, r * ch, cw, ch);
         const scatterAt = (r / rows) * 0.45 + Math.random() * 0.15;
         const dissolveAt = scatterAt + 0.2 + Math.random() * 0.2;
