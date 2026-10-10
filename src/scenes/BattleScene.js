@@ -567,7 +567,7 @@ export default class BattleScene extends Phaser.Scene {
     this.chipIcons = [];
     for (let i = 0; i < LOADOUT_MAX; i++) {
       const x = 420 + i * 70;
-      const icon = this.add.image(x, 500, 'chip-empty').setDisplaySize(48, 48);
+      const icon = this.add.image(x, 500, 'chip-empty').setDisplaySize(32, 32);
       const label = this.add.text(x, 530, `${i + 1}`, {
         fontFamily: 'monospace', fontSize: '14px', color: '#9fb3c8',
       }).setOrigin(0.5);
