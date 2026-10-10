@@ -107,9 +107,9 @@ export default class BattleScene extends Phaser.Scene {
   preload() {
     this.load.image('tile-player', 'assets/tiles/tile-player.png');
     this.load.image('tile-enemy', 'assets/tiles/tile-enemy.png');
-    this.load.spritesheet('bugchan', 'assets/sprites/bugchan-idle-strip.png', { frameWidth: 112, frameHeight: 224 });
-    this.load.image('boss', 'assets/sprites/boss-v5-cloak.png');
-    this.load.image('mandrake', 'assets/sprites/virus-rutabaga-mandrake.png');
+    this.load.spritesheet('bugchan', 'assets/sprites/bug/bugchan-idle-strip.png', { frameWidth: 112, frameHeight: 224 });
+    this.load.image('boss', 'assets/sprites/viruses/boss-v5-cloak.png');
+    this.load.image('mandrake', 'assets/sprites/viruses/virus-rutabaga-mandrake.png');
     this.load.image('bg', 'assets/tiles/bg-cyberspace.png');
     this.load.image('chip-cannon', 'assets/ui/chip-cannon.png');
     this.load.image('chip-sword', 'assets/ui/chip-sword.png');
