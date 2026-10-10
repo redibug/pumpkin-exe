@@ -7,6 +7,7 @@ export const CHIPS = [
   { id: 'sword',   name: 'Sword',   damage: 80, cooldownMs: 4000, color: 0x4fc3f7, desc: 'Slashes the tile directly ahead.' },
   { id: 'spread',  name: 'Spread',  damage: 25, cooldownMs: 3500, color: 0xba68c8, desc: 'Hits the target row and the rows above/below.' },
   { id: 'recover', name: 'Recover', damage: 0,  cooldownMs: 9000, color: 0x81c784, desc: 'Restores 60 HP to the navi.' },
+  { id: 'railgun', name: 'Railgun', damage: 50, cooldownMs: 5000, color: 0x00e5ff, desc: 'Piercing hitscan blast down the entire row.' },
 ];
 
 export const CHIP_MAP = Object.fromEntries(CHIPS.map((c) => [c.id, c]));
@@ -19,6 +20,7 @@ export const DECK = [
   'sword', 'sword', 'sword', 'sword', 'sword',
   'spread', 'spread', 'spread', 'spread', 'spread',
   'recover', 'recover', 'recover', 'recover',
+  'railgun', 'railgun', 'railgun',
 ];
 
 // Boss data — PUMPKIN.EXE. Phases keyed by HP thresholds.

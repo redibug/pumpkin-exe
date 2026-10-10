@@ -151,10 +151,12 @@ export default class BattleScene extends Phaser.Scene {
     this.load.image('chip-sword', 'assets/ui/chip-sword.png');
     this.load.image('chip-spread', 'assets/ui/chip-spread.png');
     this.load.image('chip-recover', 'assets/ui/chip-recover.png');
+    this.load.image('chip-railgun', 'assets/ui/chip-railgun.png');
     this.load.image('chip-cannon-small', 'assets/ui/chip-cannon-small.png');
     this.load.image('chip-sword-small', 'assets/ui/chip-sword-small.png');
     this.load.image('chip-spread-small', 'assets/ui/chip-spread-small.png');
     this.load.image('chip-recover-small', 'assets/ui/chip-recover-small.png');
+    this.load.image('chip-railgun-small', 'assets/ui/chip-railgun-small.png');
     this.load.image('chip-frame', 'assets/ui/chip-frame.png');
     this.load.image('mug-bugchan', 'assets/mugshots/mug-bugchan.png');
     this.load.image('mug-pumpkin', 'assets/mugshots/mug-pumpkin.png');
@@ -1167,11 +1169,36 @@ export default class BattleScene extends Phaser.Scene {
       return;
     }
 
+    if (chip.id === 'railgun') {
+      // Instant hitscan that pierces: hits ALL enemies on the navi's row.
+      const row = this.naviPos.row;
+      const s = this.navi.scaleX;
+      const mx = this.navi.x + 45 * s, my = this.navi.y - 115 * s;
+      // beam across the full row
+      const beam = this.add.line(0, 0, mx, my, 930, my, 0x00e5ff).setOrigin(0, 0);
+      beam.setLineWidth(5).setAlpha(0.95);
+      beam.setDepth(10 + row);
+      this.tweens.add({ targets: beam, alpha: 0, duration: 140, onComplete: () => beam.destroy() });
+      // damage every hittable enemy ahead on the row (pierce, no early stop)
+      for (const e of this.enemies) {
+        if (!e.alive) continue;
+        if (e.type === 'mandrake' && e.state !== 'emerged') continue;
+        if (e.row === row && e.col > this.naviPos.col) {
+          this.damageEnemy(e, chip.damage);
+          this.flash(e.sprite, chip.color);
+        }
+      }
+      return;
+    }
+
     const rows = chip.id === 'spread'
       ? [this.naviPos.row - 1, this.naviPos.row, this.naviPos.row + 1].filter((r) => r >= 0 && r < ROWS)
       : [this.naviPos.row];
     rows.forEach((r) => {
-      const proj = this.add.circle(feet.x + 30, tileCenter(0, r).y, 10, chip.color);
+      // Spread: the center bullet fires from in front; the side bullets
+      // come from Bugchan's side (her x) on the rows above/below.
+      const startX = (chip.id === 'spread' && r !== this.naviPos.row) ? feet.x : feet.x + 30;
+      const proj = this.add.circle(startX, tileCenter(0, r).y, 10, chip.color);
       proj.setDepth(10 + r); // row-ordered like other effects
       proj.setData('damage', chip.damage);
       proj.setData('row', r);
