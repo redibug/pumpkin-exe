@@ -600,15 +600,18 @@ export default class BattleScene extends Phaser.Scene {
     this.input.on('pointermove', this._customDragMove);
     this.input.on('pointerup', this._customDragUp);
 
-    // persistent chip cards (built once so select/mark can slide-tween)
+    // persistent chip cards (built once so select/mark can slide-tween).
+    // Layering: icon (label) below, frame on top. The frame is 32x32 with a
+    // 22x22 hole at x=[5,26], y=[4,25]; at 64x64 the hole is 44x44 centered
+    // at (0,-2), so the icon is 44x44 at (0,-2) to exactly fill it.
     this.customCards = [];
     for (let i = 0; i < HAND_MAX; i++) {
       const baseX = 72, baseY = 92 + i * 76;
       const root = this.add.container(baseX, baseY);
       const halo = this.add.rectangle(0, 0, 76, 76, 0xffffff, 0.12)
         .setStrokeStyle(2, 0xffffff).setVisible(false);
+      const icon = this.add.image(0, -2, 'chip-empty').setDisplaySize(44, 44);
       const frame = this.add.image(0, 0, 'chip-frame').setDisplaySize(64, 64);
-      const icon = this.add.image(0, -3, 'chip-empty').setDisplaySize(36, 36);
       const selText = this.add.text(-42, 0, '', {
         fontFamily: 'monospace', fontSize: '18px', color: '#00e5ff',
       }).setOrigin(0.5).setVisible(false);
@@ -617,7 +620,7 @@ export default class BattleScene extends Phaser.Scene {
       const x1 = this.add.line(0, 0, -m, -m, m, m, 0xff3b30).setOrigin(0, 0).setLineWidth(6).setVisible(false);
       const x2 = this.add.line(0, 0, m, -m, -m, m, 0xff3b30).setOrigin(0, 0).setLineWidth(6).setVisible(false);
       const tint = this.add.rectangle(0, 0, 64, 64, 0xff3b30, 0.15).setVisible(false);
-      root.add([halo, frame, icon, tint, x1, x2, selText]);
+      root.add([halo, icon, frame, tint, x1, x2, selText]);
       frame.setInteractive({ useHandCursor: true });
       frame.on('pointerover', () => {
         this.customCursor = { row: 0, col: i };
@@ -647,13 +650,14 @@ export default class BattleScene extends Phaser.Scene {
     }).setOrigin(0.5, 0);
     ui.add([this.customDetailImage, this.customDetailName, this.customDetailDesc]);
 
-    this.customCountsText = this.add.text(110, 455, '', {
+    // deck/discard/selected/marked indicators at the top of the window
+    this.customCountsText = this.add.text(200, 52, '', {
       fontFamily: 'monospace', fontSize: '12px', color: '#9fb3c8',
     }).setOrigin(0.5);
     ui.add(this.customCountsText);
 
-    // OK button
-    const okX = 270, okY = 455;
+    // OK button (centered at the bottom now that counts are at the top)
+    const okX = 200, okY = 455;
     this.customOkBg = this.add.rectangle(okX, okY, 110, 36, 0x0d1526)
       .setStrokeStyle(2, 0x00e5ff);
     this.customOkBg.setInteractive({ useHandCursor: true });
@@ -703,7 +707,7 @@ export default class BattleScene extends Phaser.Scene {
         card.root.x = card.baseX;
       } else {
         card.frame.setAlpha(1);
-        card.icon.setVisible(true).setTexture(`chip-${chipId}-small`);
+        card.icon.setVisible(true).setTexture(`chip-${chipId}-small`).setDisplaySize(44, 44);
         card.halo.setVisible(isCursor);
         card.selText.setVisible(selected).setText(selected ? `${selIdx + 1}→` : '');
         card.tint.setVisible(marked);
@@ -932,11 +936,12 @@ export default class BattleScene extends Phaser.Scene {
 
     // 4 loadout slots (1-4): filled from the custom screen.
     // New chip frame with the small chip art as its label.
+    // Layering: icon below, frame on top (frame has a transparent hole).
     this.chipIcons = [];
     for (let i = 0; i < LOADOUT_MAX; i++) {
       const x = 420 + i * 70;
+      const icon = this.add.image(x, 498.6, 'chip-empty').setDisplaySize(30, 30);
       const frame = this.add.image(x, 500, 'chip-frame').setDisplaySize(44, 44);
-      const icon = this.add.image(x, 498, 'chip-empty').setDisplaySize(30, 30);
       const label = this.add.text(x, 530, `${i + 1}`, {
         fontFamily: 'monospace', fontSize: '14px', color: '#9fb3c8',
       }).setOrigin(0.5);
