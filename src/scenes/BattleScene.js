@@ -72,6 +72,7 @@ export default class BattleScene extends Phaser.Scene {
     this.loadout = [null, null, null, null]; // chip ids loaded into slots 1-4
     this.customTimer = 0;
     this.customOpen = false;
+    this._skipChips = 0; // frames to skip chip input after the custom screen closes
 
     // mandrake state machine
     this.mandrake = {
@@ -241,6 +242,13 @@ export default class BattleScene extends Phaser.Scene {
     this.customSelected = []; // hand indices, in selection order
     this.customDiscard = []; // hand indices marked for discard (red X)
     this.buildCustomUI();
+    // Swallow the input that opened the screen: the opening click is still
+    // being dispatched when the cards are created, so it would pass through
+    // and "click" a card. Arm on pointer-up (or immediately if no pointer
+    // is down, i.e. opened via keyboard).
+    this.customArmed = !this.input.activePointer.isDown;
+    this._customArmHandler = () => { this.customArmed = true; };
+    this.input.once('pointerup', this._customArmHandler);
     this._customKeyHandler = (event) => this.handleCustomKey(event);
     this.input.keyboard.on('keydown', this._customKeyHandler);
   }
@@ -351,8 +359,12 @@ export default class BattleScene extends Phaser.Scene {
   closeCustomUI() {
     this.input.keyboard.off('keydown', this._customKeyHandler);
     this._customKeyHandler = null;
+    this.input.off('pointerup', this._customArmHandler);
     if (this.customUI) { this.customUI.destroy(); this.customUI = null; }
     this.customOpen = false;
+    // Swallow the key edge that closed the screen: it's still JustDown on
+    // the next frame, which battle input would read as "use front chip".
+    this._skipChips = 1;
     this.setPaused(false);
   }
 
@@ -394,7 +406,10 @@ export default class BattleScene extends Phaser.Scene {
       this.customCursor = { row: 1, col: 0 };
       this.refreshCustom();
     });
-    bg.on('pointerdown', () => this.confirmCustom());
+    bg.on('pointerdown', () => {
+      if (!this.customArmed) return; // ignore the click that opened the screen
+      this.confirmCustom();
+    });
     const label = this.add.text(x, y, 'OK', {
       fontFamily: 'monospace', fontSize: '18px',
       color: isCursor ? '#ffffff' : '#e8f6ff',
@@ -427,6 +442,7 @@ export default class BattleScene extends Phaser.Scene {
         this.refreshCustom();
       });
       bg.on('pointerdown', (pointer) => {
+        if (!this.customArmed) return; // ignore the click that opened the screen
         this.customCursor = { row: 0, col: i };
         if (pointer.rightButtonDown()) this.toggleCustomDiscard();
         else this.toggleCustomSelect();
@@ -709,7 +725,10 @@ export default class BattleScene extends Phaser.Scene {
       this.openCustom();
     }
     this.handleMovement(time);
-    this.handleChips(time);
+    // skip one frame of chip input after the custom screen closes, so the
+    // key edge that confirmed it isn't re-read as "use front chip"
+    if (this._skipChips > 0) this._skipChips--;
+    else this.handleChips(time);
     this.bossAI(time);
     this.mandrakeAI(time);
     this.updateHud(time);
