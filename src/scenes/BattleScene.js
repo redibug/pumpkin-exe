@@ -147,9 +147,8 @@ export default class BattleScene extends Phaser.Scene {
     this.load.image('boss', 'assets/sprites/viruses/boss-v5-cloak.png');
     this.load.image('mandrake', 'assets/sprites/viruses/virus-rutabaga-mandrake.png');
     this.load.image('skitterbug', 'assets/sprites/viruses/virus-skitterbug.png');
-    this.load.spritesheet('skitterbug-idle', 'assets/sprites/viruses/skitterbug-idle-strip.png', {
-      frameWidth: 118, frameHeight: 120,
-    });
+    this.load.image('skitterbug-body', 'assets/sprites/viruses/skitterbug-body.png');
+    this.load.image('skitterbug-feet', 'assets/sprites/viruses/skitterbug-feet.png');
     this.load.image('bg', 'assets/tiles/bg-cyberspace.png');
     this.load.image('chip-cannon', 'assets/ui/chip-cannon.png');
     this.load.image('chip-sword', 'assets/ui/chip-sword.png');
@@ -200,12 +199,6 @@ export default class BattleScene extends Phaser.Scene {
       key: 'bugchan-idle',
       frames: this.anims.generateFrameNumbers('bugchan', { start: 0, end: 7 }),
       frameRate: 8,
-      repeat: -1,
-    });
-    this.anims.create({
-      key: 'skitterbug-idle',
-      frames: this.anims.generateFrameNumbers('skitterbug-idle', { start: 0, end: 5 }),
-      frameRate: 6,
       repeat: -1,
     });
 
@@ -329,17 +322,22 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   spawnSkitterbug(col, row) {
-    const sprite = this.physics.add.sprite(0, 0, 'skitterbug-idle', 0);
-    sprite.play('skitterbug-idle');
-    sprite.setData('fitMax', AUTOSCALE.skitterbug ?? FIT_MAX);
-    sprite.setOrigin(0.5, 1);
-    this.placeFighter(sprite, col, row, SKITTER_MANUAL);
+    // Layered: body (bobs, shoots, teleports) + feet (stays planted).
+    // e.sprite is the body so all existing enemy logic works unchanged;
+    // e.feet follows the tile but never bobs.
+    const body = this.physics.add.sprite(0, 0, 'skitterbug-body');
+    body.setData('fitMax', AUTOSCALE.skitterbug ?? FIT_MAX);
+    body.setOrigin(0.5, 1);
+    this.placeFighter(body, col, row, SKITTER_MANUAL);
+    const feet = this.add.image(0, 0, 'skitterbug-feet').setOrigin(0.5, 1);
+    this.placeFighter(feet, col, row, SKITTER_MANUAL);
     const enemy = {
-      type: 'skitterbug', sprite, col, row,
+      type: 'skitterbug', sprite: body, feet, col, row,
       hp: SKITTER.maxHp, maxHp: SKITTER.maxHp, alive: true,
       nextCheck: 0,
       moveIntent: Math.random() < 0.5 ? -1 : 1, // -1 = up, 1 = down
       canSpit: false, // starts with a move (move, spit, move, spit...)
+      bobPhase: Math.random() * Math.PI * 2, // desync the idle bob
       shootAnim: false, // true while the shoot tween is playing
       hpBar: this.makeHpBar(),
     };
@@ -1390,7 +1388,12 @@ export default class BattleScene extends Phaser.Scene {
   // Otherwise move (up/down by intent). Can't spit twice without moving.
 
   skitterbugAI(e, time) {
-    // idle is the sprite strip animation; shoot tween handles the rest
+    // idle: body bobs (±4px) while feet stay planted on the tile
+    if (!e.sprite.getData('teleporting') && !e.shootAnim) {
+      const baseY = tileFeet(e.col, e.row).y;
+      e.sprite.y = baseY + Math.sin(time * 0.006 + e.bobPhase) * 4;
+    }
+
     if (time < e.nextCheck) return;
     e.nextCheck = time + SKITTER.checkIntervalMs;
 
@@ -1414,6 +1417,7 @@ export default class BattleScene extends Phaser.Scene {
     e.moveIntent = dir;
     e.row = nr;
     this.teleportMove(e.sprite, e.col, e.row, SKITTER_MANUAL);
+    this.placeFighter(e.feet, e.col, e.row, SKITTER_MANUAL); // feet pop, no teleport fx
     e.canSpit = true; // moving restores the spit
   }
 
@@ -1490,6 +1494,12 @@ export default class BattleScene extends Phaser.Scene {
       if (e.warnRect) { e.warnRect.destroy(); e.warnRect = null; }
       if (e.mound) e.mound.setVisible(false);
       this.tweens.killTweensOf(e.sprite); // stop idle/shoot tweens
+      // skitterbug: feet fade with the body
+      if (e.feet) {
+        this.tweens.add({ targets: e.feet, alpha: 0,
+          duration: e.type === 'pumpkin' ? 400 : 350,
+          onComplete: () => e.feet.setVisible(false) });
+      }
       const s0 = e.sprite.scaleX;
       const grow = e.type === 'pumpkin' ? 1.2 : 1.45;
       this.tweens.add({ targets: e.sprite, alpha: 0, scaleX: s0 * grow, scaleY: s0 * grow,
