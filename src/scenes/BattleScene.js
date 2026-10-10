@@ -334,12 +334,14 @@ export default class BattleScene extends Phaser.Scene {
       hpBar: this.makeHpBar(),
     };
     // Idle bob as an INFINITE tween (keeps playing during pause, per the
-    // standing rule). Anchored: feet never go below the tile (y from baseY
-    // up to baseY-3, never baseY+).
-    enemy.bobOffset = { v: 0 };
+    // standing rule). Squash-and-stretch on SCALE, not y — the sprite is
+    // anchored at bottom-center (origin 0.5,1), so the feet stay planted.
+    enemy.baseScaleX = sprite.scaleX;
+    enemy.baseScaleY = sprite.scaleY;
+    enemy.squash = { v: 0 };
     enemy.bobTween = this.tweens.add({
-      targets: enemy.bobOffset,
-      v: 3,
+      targets: enemy.squash,
+      v: 1,
       duration: 700 + Math.random() * 300, // desync per bug
       yoyo: true,
       repeat: -1, // infinite: survives setPaused
@@ -347,7 +349,11 @@ export default class BattleScene extends Phaser.Scene {
       onUpdate: () => {
         if (!enemy.alive) return;
         if (sprite.getData('teleporting') || enemy.shootAnim) return;
-        sprite.y = tileFeet(enemy.col, enemy.row).y - enemy.bobOffset.v;
+        const k = enemy.squash.v;
+        sprite.setScale(
+          enemy.baseScaleX * (1 + 0.04 * k), // wider
+          enemy.baseScaleY * (1 - 0.06 * k)  // shorter
+        );
       },
     });
     this.enemies.push(enemy);
@@ -1419,7 +1425,11 @@ export default class BattleScene extends Phaser.Scene {
     }
     e.moveIntent = dir;
     e.row = nr;
-    this.teleportMove(e.sprite, e.col, e.row, SKITTER_MANUAL);
+    this.teleportMove(e.sprite, e.col, e.row, SKITTER_MANUAL, () => {
+      // refresh base scale after the move (perspective may differ by row)
+      e.baseScaleX = e.sprite.scaleX;
+      e.baseScaleY = e.sprite.scaleY;
+    });
     e.canSpit = true; // moving restores the spit
   }
 
