@@ -3,6 +3,7 @@ import { COLS, ROWS, project, tileCorners, tileFeet, tileCenter, isPlayerTile, g
 import { CHIP_MAP, DECK, BOSS } from '../systems/chips.js';
 import { RUTABAGA_MANDRAKE } from '../systems/viruses.js';
 import { fitFactor, FIT_MAX } from '../systems/spriteFit.js';
+import { createDebugGameplay, isDialogueSkipped } from '../systems/debugGameplay.js';
 import { createDebugOverlay } from '../systems/debugOverlay.js';
 import { DialogueUI, SCRIPTS } from '../systems/dialogue.js';
 
@@ -231,6 +232,19 @@ export default class BattleScene extends Phaser.Scene {
       if (this.debugVisible) this.debugOverlay.refresh();
     });
 
+    // ---- gameplay debug panel (TEMPORARY: hide before shipping) ----
+    // G toggles it. Skip-dialogue is local-only (localStorage, never in repo).
+    this.debugGameplay = createDebugGameplay({
+      onSkipBattle: () => this.debugSkipBattle(),
+    });
+    this.debugGameplay.setVisible(false);
+    this.debugGameplayVisible = false;
+    document.getElementById('game').appendChild(this.debugGameplay.el);
+    this.input.keyboard.on('keydown-G', () => {
+      this.debugGameplayVisible = !this.debugGameplayVisible;
+      this.debugGameplay.setVisible(this.debugGameplayVisible);
+    });
+
     // ---- input ----
     this.cursors = this.input.keyboard.createCursorKeys();
     this.keys = this.input.keyboard.addKeys('ONE,TWO,THREE,FOUR');
@@ -387,11 +401,24 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   startDialogue(script, onDone) {
+    // Local-only debug: skip all dialogue (localStorage flag, never committed)
+    if (isDialogueSkipped()) {
+      if (onDone) onDone();
+      return;
+    }
     this.setPaused(true);
     this.dialogue.start(script, () => {
       this.setPaused(false);
       if (onDone) onDone();
     });
+  }
+
+  // Debug: jump to the next battle (no-op on the last one).
+  debugSkipBattle() {
+    if (this.battleIndex + 1 >= BATTLES.length) return;
+    // close any open UI/dialogue so the restart is clean
+    if (this.customOpen) this.closeCustomUI();
+    this.scene.restart({ battleIndex: this.battleIndex + 1 });
   }
 
   // ================= custom screen =================
