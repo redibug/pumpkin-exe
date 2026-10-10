@@ -147,9 +147,9 @@ export default class BattleScene extends Phaser.Scene {
     this.load.image('boss', 'assets/sprites/viruses/boss-v5-cloak.png');
     this.load.image('mandrake', 'assets/sprites/viruses/virus-rutabaga-mandrake.png');
     this.load.image('skitterbug', 'assets/sprites/viruses/virus-skitterbug.png');
-    this.load.spritesheet('skitterbug-idle', 'assets/sprites/viruses/skitterbug-idle-strip.png', {
-      frameWidth: 118, frameHeight: 120,
-    });
+    this.load.image('skitterbug-body2', 'assets/sprites/viruses/skitterbug-body2.png');
+    this.load.image('skitterbug-leg-r', 'assets/sprites/viruses/skitterbug-leg-r.png');
+    this.load.image('skitterbug-leg-l', 'assets/sprites/viruses/skitterbug-leg-l.png');
     this.load.image('bg', 'assets/tiles/bg-cyberspace.png');
     this.load.image('chip-cannon', 'assets/ui/chip-cannon.png');
     this.load.image('chip-sword', 'assets/ui/chip-sword.png');
@@ -200,12 +200,6 @@ export default class BattleScene extends Phaser.Scene {
       key: 'bugchan-idle',
       frames: this.anims.generateFrameNumbers('bugchan', { start: 0, end: 7 }),
       frameRate: 8,
-      repeat: -1,
-    });
-    this.anims.create({
-      key: 'skitterbug-idle',
-      frames: this.anims.generateFrameNumbers('skitterbug-idle', { start: 0, end: 5 }),
-      frameRate: 6,
       repeat: -1,
     });
 
@@ -329,17 +323,23 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   spawnSkitterbug(col, row) {
-    const sprite = this.physics.add.sprite(0, 0, 'skitterbug-idle', 0);
-    sprite.play('skitterbug-idle');
-    sprite.setData('fitMax', AUTOSCALE.skitterbug ?? FIT_MAX);
-    sprite.setOrigin(0.5, 1);
-    this.placeFighter(sprite, col, row, SKITTER_MANUAL);
+    // Three layers (Mel's art): right leg = back, body = middle, left leg = front.
+    // Container anchored at bottom-middle: (0,0) is the body's bottom-center,
+    // so tweens scale/bob from the feet.
+    const container = this.add.container(0, 0);
+    const legR = this.add.image(-55, -60, 'skitterbug-leg-r').setOrigin(0, 0); // our left, behind
+    const body = this.add.image(0, 0, 'skitterbug-body2').setOrigin(0.5, 1);
+    const legL = this.add.image(24, -70, 'skitterbug-leg-l').setOrigin(0, 0);  // our right, in front
+    container.add([legR, body, legL]);
+    container.setData('fitMax', AUTOSCALE.skitterbug ?? FIT_MAX);
+    this.placeFighter(container, col, row, SKITTER_MANUAL);
     const enemy = {
-      type: 'skitterbug', sprite, col, row,
+      type: 'skitterbug', sprite: container, bodyMesh: body, legR, legL, col, row,
       hp: SKITTER.maxHp, maxHp: SKITTER.maxHp, alive: true,
       nextCheck: 0,
       moveIntent: Math.random() < 0.5 ? -1 : 1, // -1 = up, 1 = down
       canSpit: false, // starts with a move (move, spit, move, spit...)
+      bobPhase: Math.random() * Math.PI * 2, // desync the idle bob
       shootAnim: false, // true while the shoot tween is playing
       hpBar: this.makeHpBar(),
     };
@@ -362,7 +362,9 @@ export default class BattleScene extends Phaser.Scene {
     t.setVisible(show);
     if (!show) return;
     const s = enemy.sprite;
-    t.setPosition(s.x, s.y - s.displayHeight - 14);
+    // containers don't have displayHeight; use the body mesh if present
+    const h = enemy.bodyMesh ? enemy.bodyMesh.displayHeight : s.displayHeight;
+    t.setPosition(s.x, s.y - h - 14);
     t.setText(`${enemy.hp}`);
   }
 
@@ -1390,7 +1392,12 @@ export default class BattleScene extends Phaser.Scene {
   // Otherwise move (up/down by intent). Can't spit twice without moving.
 
   skitterbugAI(e, time) {
-    // idle is the sprite strip animation; shoot tween handles the rest
+    // idle: bob the whole layered assembly up/down, anchored at bottom-middle
+    if (!e.sprite.getData('teleporting') && !e.shootAnim) {
+      const baseY = tileFeet(e.col, e.row).y;
+      e.sprite.y = baseY + Math.sin(time * 0.006 + e.bobPhase) * 5;
+    }
+
     if (time < e.nextCheck) return;
     e.nextCheck = time + SKITTER.checkIntervalMs;
 
@@ -1413,8 +1420,30 @@ export default class BattleScene extends Phaser.Scene {
     }
     e.moveIntent = dir;
     e.row = nr;
-    this.teleportMove(e.sprite, e.col, e.row, SKITTER_MANUAL);
+    this.skitterbugTeleport(e);
     e.canSpit = true; // moving restores the spit
+  }
+
+  skitterbugTeleport(e) {
+    // Container-friendly teleport: quick fade out, move, fade in.
+    const c = e.sprite;
+    if (c.getData('teleporting')) {
+      this.placeFighter(c, e.col, e.row, SKITTER_MANUAL);
+      return;
+    }
+    c.setData('teleporting', true);
+    this.tweens.add({
+      targets: c, alpha: 0, duration: 100,
+      onComplete: () => {
+        this.placeFighter(c, e.col, e.row, SKITTER_MANUAL);
+        // reset bob so it doesn't snap
+        c.y = tileFeet(e.col, e.row).y;
+        this.tweens.add({
+          targets: c, alpha: 1, duration: 100,
+          onComplete: () => c.setData('teleporting', false),
+        });
+      },
+    });
   }
 
   spitIchor(e) {
@@ -1476,8 +1505,14 @@ export default class BattleScene extends Phaser.Scene {
   // ================= damage =================
 
   flash(target, color) {
-    target.setTintFill(color);
-    this.time.delayedCall(120, () => { if (target.active) target.clearTint(); });
+    // target can be a sprite or a container (flash all image children)
+    const targets = target.type === 'Container' ? target.list : [target];
+    for (const t of targets) {
+      if (t.setTintFill) {
+        t.setTintFill(color);
+        this.time.delayedCall(120, () => { if (t.active) t.clearTint(); });
+      }
+    }
   }
 
   damageEnemy(e, amount) {
