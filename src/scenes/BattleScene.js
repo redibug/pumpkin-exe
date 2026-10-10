@@ -625,8 +625,10 @@ export default class BattleScene extends Phaser.Scene {
       this.customCards.push({ root, halo, frame, icon, selText, x1, x2, tint, baseX });
     }
 
-    // detail area: large art + name + desc of the highlighted chip
-    this.customDetailImage = this.add.image(255, 160, 'chip-empty').setDisplaySize(140, 140);
+    // detail area: large art + name + desc of the highlighted chip.
+    // The art fits dynamically within 160x160, preserving aspect ratio.
+    this.customDetailImage = this.add.image(255, 160, 'chip-empty');
+    this.fitImageToArea(this.customDetailImage, 160, 160);
     this.customDetailName = this.add.text(255, 248, '', {
       fontFamily: 'monospace', fontSize: '20px', color: '#e8f6ff',
     }).setOrigin(0.5);
@@ -666,6 +668,13 @@ export default class BattleScene extends Phaser.Scene {
     this.refreshCustom();
   }
 
+  // Scale an image to fit within a max area, preserving aspect ratio.
+  // Call after setTexture (reads the new texture's frame dimensions).
+  fitImageToArea(image, maxW, maxH) {
+    const scale = Math.min(maxW / image.width, maxH / image.height);
+    image.setDisplaySize(image.width * scale, image.height * scale);
+  }
+
   refreshCustom() {
     if (!this.customUI) return;
     // cards
@@ -701,6 +710,7 @@ export default class BattleScene extends Phaser.Scene {
       if (isCursor && chipId) {
         const chip = CHIP_MAP[chipId];
         this.customDetailImage.setTexture(`chip-${chipId}`).setVisible(true);
+        this.fitImageToArea(this.customDetailImage, 160, 160);
         this.customDetailName.setText(chip.name);
         this.customDetailDesc.setText(chip.desc);
       }
