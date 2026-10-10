@@ -411,6 +411,11 @@ export default class BattleScene extends Phaser.Scene {
       const marked = this.customDiscard.includes(i);
       const isCursor = this.customCursor.row === 0 && this.customCursor.col === i;
       const border = selIdx >= 0 ? 0x00e5ff : marked ? 0xff3b30 : isCursor ? 0xffffff : 0x334155;
+      // hover halo: visible over any card state (selected/marked keep their border)
+      if (isCursor) {
+        card.add(this.add.rectangle(0, 0, cw + 12, ch + 12, 0xffffff, 0.15)
+          .setStrokeStyle(2, 0xffffff));
+      }
       const bg = this.add.rectangle(0, 0, cw, ch, 0x0d1526)
         .setStrokeStyle(selIdx >= 0 ? 4 : 2, border);
       bg.setInteractive({ useHandCursor: true });
