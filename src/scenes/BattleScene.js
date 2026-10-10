@@ -461,7 +461,7 @@ export default class BattleScene extends Phaser.Scene {
           this._pausedAnims.push(a);
         }
       }
-      this._pausedTweens = this.tweens.getTweens().filter((t) => !t.isInfinite && !t.isFinished());
+      this._pausedTweens = this.tweens.getTweens().filter((t) => !t.isInfinite && !t.isFinished() && !t._noPause);
       this._pausedTweens.forEach((t) => { t.paused = true; });
     } else {
       const pausedMs = this.time.now - (this.pauseStart || this.time.now);
@@ -943,7 +943,7 @@ export default class BattleScene extends Phaser.Scene {
     }
 
     const progress = { t: 0 };
-    this.tweens.add({
+    const tw = this.tweens.add({
       targets: progress, t: 1, duration: DURATION, ease: 'Quad.easeIn',
       onUpdate: () => {
         for (const ch of chunks) {
@@ -969,6 +969,8 @@ export default class BattleScene extends Phaser.Scene {
         if (onDone) onDone();
       },
     });
+    // Delete animations don't affect game timing; keep playing during dialogue.
+    tw._noPause = true;
   }
 
   playTeleportFrames(sprite, direction, onDone) {
@@ -1687,7 +1689,14 @@ export default class BattleScene extends Phaser.Scene {
 
   flash(target, color) {
     target.setTintFill(color);
-    this.time.delayedCall(120, () => { if (target.active) target.clearTint(); });
+    // Use a tween (not delayedCall) so the flash isn't frozen by time.paused.
+    // Marked _noPause so it continues during dialogue.
+    const tw = this.tweens.add({
+      targets: {},
+      duration: 120,
+      onComplete: () => { if (target.active) target.clearTint(); },
+    });
+    tw._noPause = true;
   }
 
   damageEnemy(e, amount) {
@@ -1729,6 +1738,9 @@ export default class BattleScene extends Phaser.Scene {
     // don't trigger endings twice, or while a script is playing
     if (this.over || this.dialogue.isActive()) return;
     if (this.naviHp <= 0) {
+      // Bugchan gets the delete animation too
+      this.tweens.killTweensOf(this.navi);
+      this.dissolveSprite(this.navi);
       this.startDialogue(SCRIPTS.defeat, () => this.showGameOver());
       return;
     }
