@@ -22,10 +22,21 @@ const SKITTER = {
 };
 const SKITTER_MANUAL = 0.85;
 
+const SENTRY = {
+  maxHp: 80,
+  checkIntervalMs: 2000,  // how often it scans for the navi on its row
+  telegraphMs: 800,       // red-eye warning before firing
+  bulletSpeed: 380,       // fast laser bolt (chips fly at 520)
+  bulletDamage: 15,
+  bulletColor: 0xff3b30,  // red laser
+};
+const SENTRY_MANUAL = 0.9;
+
 // Per-enemy-type auto-scale: longest texture side auto-shrinks to fit.
 // Unlisted types use the default FIT_MAX (512).
 const AUTOSCALE = {
   skitterbug: 120,
+  sentry: 140,
 };
 
 // ---- battles ----
@@ -48,6 +59,26 @@ const BATTLES = [
     story: [
       { speaker: 'mel', text: 'Good work. But I see roots digging nearby. Stay sharp.' },
       { speaker: 'bugchan', text: 'Roots? Smells like rutabagas...' },
+    ],
+  },
+  {
+    name: 'SENTRY POST',
+    naviStart: { col: 0, row: 2 }, // bottom left
+    enemies: [
+      { type: 'skitterbug', col: 3, row: 0 }, // top left enemy square
+      { type: 'sentry', col: 5, row: 1 },     // far right middle
+    ],
+    intro: [
+      { speaker: 'mel', text: 'A sentry turret is guarding that lane. It only shoots when you are on its row.' },
+      { speaker: 'bugchan', text: 'Then I will stay off its row! Easy!' },
+      { speaker: 'sentry', text: 'TARGET ACQUIRED.' },
+    ],
+    victory: [
+      { speaker: 'bugchan', text: 'Turret down! It never even moved!' },
+    ],
+    story: [
+      { speaker: 'mel', text: 'Nice dodging. Something is sprouting ahead...' },
+      { speaker: 'bugchan', text: 'I smell veggies. Rutabaga veggies!' },
     ],
   },
   {
@@ -147,6 +178,7 @@ export default class BattleScene extends Phaser.Scene {
     this.load.image('boss', 'assets/sprites/viruses/boss-v5-cloak.png');
     this.load.image('mandrake', 'assets/sprites/viruses/virus-rutabaga-mandrake.png');
     this.load.image('skitterbug', 'assets/sprites/viruses/virus-skitterbug.png');
+    this.load.image('sentry', 'assets/sprites/viruses/virus-sentry-clean.png');
     this.load.image('bg', 'assets/tiles/bg-cyberspace.png');
     this.load.image('chip-cannon', 'assets/ui/chip-cannon.png');
     this.load.image('chip-sword', 'assets/ui/chip-sword.png');
@@ -171,6 +203,9 @@ export default class BattleScene extends Phaser.Scene {
     // ---- state ----
     this.naviHp = 100; this.naviMaxHp = 100;
     this.naviPos = { col: 1, row: 1 };
+    // per-battle start position (e.g. SENTRY POST starts bottom-left)
+    const _battleCfg = BATTLES[this.battleIndex];
+    if (_battleCfg.naviStart) this.naviPos = { ..._battleCfg.naviStart };
     this.projectiles = this.add.group(); // tile-based collision, no physics
     this.enemyProjectiles = this.add.group(); // virus bullets (hurt the navi)
     this.shootReadyAt = 0; // buster hitscan fire rate gate
@@ -212,6 +247,7 @@ export default class BattleScene extends Phaser.Scene {
       if (e.type === 'pumpkin') this.spawnPumpkin(e.col, e.row);
       else if (e.type === 'mandrake') this.spawnMandrake(e.col, e.row, e.big);
       else if (e.type === 'skitterbug') this.spawnSkitterbug(e.col, e.row);
+      else if (e.type === 'sentry') this.spawnSentry(e.col, e.row);
     }
     // NB: enemy AI timers are armed when the intro dialogue finishes, so
     // the battle doesn't run during the cutscene.
@@ -356,6 +392,24 @@ export default class BattleScene extends Phaser.Scene {
         );
       },
     });
+    this.enemies.push(enemy);
+    return enemy;
+  }
+
+  spawnSentry(col, row) {
+    // Stationary turret. Never moves. Watches its row; when the navi steps
+    // onto it, the eye burns red (telegraph), then it fires a laser bolt.
+    const sprite = this.physics.add.sprite(0, 0, 'sentry');
+    sprite.setData('fitMax', AUTOSCALE.sentry ?? FIT_MAX);
+    sprite.setOrigin(0.5, 1);
+    this.placeFighter(sprite, col, row, SENTRY_MANUAL);
+    const enemy = {
+      type: 'sentry', sprite, col, row,
+      hp: SENTRY.maxHp, maxHp: SENTRY.maxHp, alive: true,
+      nextCheck: 0,
+      targeting: false, // true during the red-eye telegraph
+      hpBar: this.makeHpBar(),
+    };
     this.enemies.push(enemy);
     return enemy;
   }
@@ -1295,6 +1349,7 @@ export default class BattleScene extends Phaser.Scene {
       if (e.type === 'pumpkin') this.pumpkinAI(e, time);
       else if (e.type === 'mandrake') this.mandrakeAI(e, time);
       else if (e.type === 'skitterbug') this.skitterbugAI(e, time);
+      else if (e.type === 'sentry') this.sentryAI(e, time);
     }
   }
 
@@ -1431,6 +1486,41 @@ export default class BattleScene extends Phaser.Scene {
       e.baseScaleY = e.sprite.scaleY;
     });
     e.canSpit = true; // moving restores the spit
+  }
+
+  sentryAI(e, time) {
+    if (time < e.nextCheck || e.targeting) return;
+    e.nextCheck = time + SENTRY.checkIntervalMs;
+
+    // Only fires when the navi is on its row.
+    if (this.naviPos.row !== e.row) return;
+
+    // Telegraph: eye burns red, then the laser fires.
+    e.targeting = true;
+    this.flash(e.sprite, 0xff3b30);
+    this.time.delayedCall(SENTRY.telegraphMs, () => {
+      if (!e.alive || this.over) { e.targeting = false; return; }
+      // Re-check: navi might have dodged off the row during telegraph.
+      if (this.naviPos.row === e.row) this.fireSentryLaser(e);
+      e.targeting = false;
+    });
+  }
+
+  fireSentryLaser(e) {
+    // Mouth splits open (quick squash) as the bolt fires.
+    const s = e.sprite;
+    const bx = s.scaleX, by = s.scaleY;
+    this.tweens.add({
+      targets: s, scaleX: bx * 1.1, scaleY: by * 0.85, duration: 80, yoyo: true,
+      onComplete: () => s.setScale(bx, by),
+    });
+    const p = tileCenter(e.col, e.row);
+    const bullet = this.add.circle(p.x - 20, p.y, 7, SENTRY.bulletColor);
+    bullet.setDepth(10 + e.row);
+    bullet.setData('vx', -SENTRY.bulletSpeed);
+    bullet.setData('row', e.row);
+    bullet.setData('damage', SENTRY.bulletDamage);
+    this.enemyProjectiles.add(bullet);
   }
 
   spitIchor(e) {
