@@ -890,6 +890,65 @@ export default class BattleScene extends Phaser.Scene {
     });
   }
 
+  // Dissolve a sprite top-to-bottom when it's deleted. Slices the current
+  // frame into horizontal strips; a flickering dissolve band wipes down,
+  // strips above it vanish, strips below stay solid until the band reaches
+  // them. Pixels scatter slightly upward as they dissolve.
+  dissolveSprite(sprite, onDone) {
+    const STRIPS = 24;
+    const DURATION = 500;
+
+    const frame = sprite.frame;
+    const fw = frame.width, fh = frame.height;
+    const sh = fh / STRIPS;
+    const scaleX = sprite.scaleX, scaleY = sprite.scaleY;
+    const ox = sprite.x, oy = sprite.y;
+    const key = sprite.texture.key;
+    const frameName = frame.name;
+    const depth = sprite.depth;
+
+    sprite.setVisible(false);
+
+    const strips = [];
+    for (let i = 0; i < STRIPS; i++) {
+      const img = this.add.image(ox, oy, key, frameName);
+      img.setOrigin(0.5, 1).setScale(scaleX, scaleY).setDepth(depth + 1);
+      img.setCrop(0, i * sh, fw, sh);
+      strips.push(img);
+    }
+
+    const progress = { t: 0 };
+    this.tweens.add({
+      targets: progress,
+      t: 1,
+      duration: DURATION,
+      ease: 'Quad.easeIn',
+      onUpdate: () => {
+        const wipe = progress.t * (STRIPS + 4); // +4 so the band clears the bottom
+        for (let i = 0; i < STRIPS; i++) {
+          const st = strips[i];
+          const d = i - wipe; // <0 above frontier, 0..4 in band, >4 below
+          if (d < 0) {
+            st.setVisible(false);
+          } else if (d < 4) {
+            // dissolve band: flicker + scatter upward
+            st.setVisible(Math.random() > 0.45);
+            st.y = oy - Math.random() * 6 * (1 - d / 4);
+            st.setAlpha(0.4 + Math.random() * 0.6);
+          } else {
+            st.setVisible(true);
+            st.setAlpha(1);
+            st.y = oy;
+          }
+        }
+      },
+      onComplete: () => {
+        for (const st of strips) st.destroy();
+        if (onDone) onDone();
+      },
+    });
+  }
+
   playTeleportFrames(sprite, direction, onDone) {
     const STRIPS = 40;
     const FRAME_MS = 6;
@@ -1621,11 +1680,8 @@ export default class BattleScene extends Phaser.Scene {
       if (e.sensor) { this.tweens.killTweensOf(e.sensor); e.sensor.setVisible(false); }
       this.tweens.killTweensOf(e.sprite); // stop idle/shoot tweens
       if (e.bobTween) e.bobTween.stop(); // stop the infinite idle bob
-      const s0 = e.sprite.scaleX;
-      const grow = e.type === 'pumpkin' ? 1.2 : 1.45;
-      this.tweens.add({ targets: e.sprite, alpha: 0, scaleX: s0 * grow, scaleY: s0 * grow,
-        duration: e.type === 'pumpkin' ? 400 : 350,
-        onComplete: () => e.sprite.setVisible(false) });
+      // dissolve top-to-bottom (replaces the old grow+fade)
+      this.dissolveSprite(e.sprite);
       this.updateHpBar(e); // hides the bar
     }
   }
