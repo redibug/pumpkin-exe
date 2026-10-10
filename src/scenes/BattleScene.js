@@ -795,10 +795,10 @@ export default class BattleScene extends Phaser.Scene {
     if (time < this.shootReadyAt) return;
     this.shootReadyAt = time + 300;
     this.showPunchFrame();
+    const row = this.naviPos.row;
     const s = this.navi.scaleX;
     const mx = this.navi.x + 45 * s, my = this.navi.y - 115 * s;
-    this.showMuzzleFlash(mx, my);
-    const row = this.naviPos.row;
+    this.showMuzzleFlash(mx, my, row);
     let target = null, targetCol = 99;
     if (this.bossHp > 0 && this.bossPos.row === row
       && this.bossPos.col > this.naviPos.col && this.bossPos.col < targetCol) {
@@ -814,7 +814,7 @@ export default class BattleScene extends Phaser.Scene {
     // or the beam centers on the wrong point.
     const beam = this.add.line(0, 0, mx, my, endX, my, 0xfff176).setOrigin(0, 0);
     beam.setLineWidth(3).setAlpha(0.9);
-    beam.setDepth(18);
+    beam.setDepth(10 + row); // row-ordered like the other battle effects
     this.tweens.add({ targets: beam, alpha: 0, duration: 110, onComplete: () => beam.destroy() });
     if (target === 'boss') { this.damageBoss(10); this.flash(this.boss, 0xfff176); }
     else if (target === 'mandrake') { this.damageMandrake(10); this.flash(this.mandrakeSprite, 0xfff176); }
@@ -842,8 +842,8 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   // PLACEHOLDER for Mel's muzzle-flash overlay: procedural star flash.
-  showMuzzleFlash(x, y) {
-    const g = this.add.graphics().setDepth(21);
+  showMuzzleFlash(x, y, row) {
+    const g = this.add.graphics().setDepth(10 + row); // row-ordered
     const pts = [];
     for (let k = 0; k < 16; k++) {
       const r = k % 2 === 0 ? 26 : 10;
