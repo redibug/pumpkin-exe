@@ -136,6 +136,7 @@ export default class BattleScene extends Phaser.Scene {
     this.cursors = this.input.keyboard.createCursorKeys();
     this.keys = this.input.keyboard.addKeys('ONE,TWO,THREE,FOUR');
     this.customKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+    this.input.mouse.disableContextMenu(); // right-click discards in the custom screen
 
     // ---- collisions ----
     this.physics.add.overlap(this.projectiles, this.boss, (boss, proj) => {
@@ -224,8 +225,8 @@ export default class BattleScene extends Phaser.Scene {
   // cards, pick up to LOADOUT_MAX for the 1-4 slots. Unpicked cards stay
   // in hand for next time; X marks a card for discard (red X, tossed on
   // confirm). Confirming spends the old loadout to the discard pile and
-  // loads the new picks. OK/CANCEL are on-screen buttons, navigable with
-  // the arrows and clickable with the mouse.
+  // loads the new picks. OK is an on-screen button, navigable with the
+  // arrows and clickable with the mouse (ESC still cancels).
   openCustom() {
     if (this.customOpen || this.over || this.dialogue.isActive()) return;
     this.customOpen = true;
@@ -254,7 +255,7 @@ export default class BattleScene extends Phaser.Scene {
 
   handleCustomKey(event) {
     const cur = this.customCursor;
-    const rowLen = [this.hand.length, 2];
+    const rowLen = [this.hand.length, 1]; // cards row, OK button row
     switch (event.code) {
       case 'ArrowLeft':
         cur.col = Math.max(0, cur.col - 1);
@@ -266,7 +267,7 @@ export default class BattleScene extends Phaser.Scene {
         if (cur.row === 1) { cur.row = 0; cur.col = Math.min(cur.col, this.hand.length - 1); }
         break;
       case 'ArrowDown':
-        if (cur.row === 0) { cur.row = 1; cur.col = Math.min(cur.col, 1); }
+        if (cur.row === 0) { cur.row = 1; cur.col = 0; }
         break;
       case 'KeyZ':
         this.activateCustomCursor();
@@ -283,16 +284,14 @@ export default class BattleScene extends Phaser.Scene {
     this.refreshCustom();
   }
 
-  // Z: the generic "press" key — toggles a card, or pushes the hovered button
+  // Z: the generic "press" key — toggles a card, or pushes the OK button
   activateCustomCursor() {
     const cur = this.customCursor;
     if (cur.row === 0) {
       this.toggleCustomSelect();
       this.refreshCustom();
-    } else if (cur.col === 0) {
-      this.confirmCustom();
     } else {
-      this.cancelCustom();
+      this.confirmCustom();
     }
   }
 
@@ -370,7 +369,7 @@ export default class BattleScene extends Phaser.Scene {
     ui.add(this.customCardLayer);
     this.customButtonLayer = this.add.container(0, 0);
     ui.add(this.customButtonLayer);
-    ui.add(this.add.text(480, 472, 'arrows: move · Z: select/press · X: mark discard · mouse: click · ESC: cancel', {
+    ui.add(this.add.text(480, 472, 'arrows: move · Z/click: select · X/right-click: discard · ESC: cancel', {
       fontFamily: 'monospace', fontSize: '14px', color: '#9fb3c8',
     }).setOrigin(0.5));
     this.refreshCustom();
@@ -383,30 +382,21 @@ export default class BattleScene extends Phaser.Scene {
 
   refreshCustomButtons() {
     this.customButtonLayer.removeAll(true);
-    const defs = [
-      { name: 'OK', color: 0x00e5ff },
-      { name: 'CANCEL', color: 0x9fb3c8 },
-    ];
-    defs.forEach((def, bi) => {
-      const x = bi === 0 ? 408 : 552, y = 420;
-      const isCursor = this.customCursor.row === 1 && this.customCursor.col === bi;
-      const bg = this.add.rectangle(x, y, 130, 44, 0x0d1526)
-        .setStrokeStyle(2, isCursor ? 0xffffff : def.color);
-      bg.setInteractive({ useHandCursor: true });
-      bg.on('pointerover', () => {
-        this.customCursor = { row: 1, col: bi };
-        this.refreshCustom();
-      });
-      bg.on('pointerdown', () => {
-        if (bi === 0) this.confirmCustom();
-        else this.cancelCustom();
-      });
-      const label = this.add.text(x, y, def.name, {
-        fontFamily: 'monospace', fontSize: '18px',
-        color: isCursor ? '#ffffff' : '#e8f6ff',
-      }).setOrigin(0.5);
-      this.customButtonLayer.add([bg, label]);
+    const x = 480, y = 420;
+    const isCursor = this.customCursor.row === 1;
+    const bg = this.add.rectangle(x, y, 130, 44, 0x0d1526)
+      .setStrokeStyle(2, isCursor ? 0xffffff : 0x00e5ff);
+    bg.setInteractive({ useHandCursor: true });
+    bg.on('pointerover', () => {
+      this.customCursor = { row: 1, col: 0 };
+      this.refreshCustom();
     });
+    bg.on('pointerdown', () => this.confirmCustom());
+    const label = this.add.text(x, y, 'OK', {
+      fontFamily: 'monospace', fontSize: '18px',
+      color: isCursor ? '#ffffff' : '#e8f6ff',
+    }).setOrigin(0.5);
+    this.customButtonLayer.add([bg, label]);
   }
 
   refreshCustomCards() {
@@ -428,9 +418,10 @@ export default class BattleScene extends Phaser.Scene {
         this.customCursor = { row: 0, col: i };
         this.refreshCustom();
       });
-      bg.on('pointerdown', () => {
+      bg.on('pointerdown', (pointer) => {
         this.customCursor = { row: 0, col: i };
-        this.toggleCustomSelect();
+        if (pointer.rightButtonDown()) this.toggleCustomDiscard();
+        else this.toggleCustomSelect();
         this.refreshCustom();
       });
       card.add(bg);
