@@ -20,7 +20,7 @@ const SKITTER = {
   bulletDamage: 10,
   bulletColor: 0x9dbb2e,  // sickly yellow-green ichor
 };
-const SKITTER_MANUAL = 0.85;
+const SKITTER_MANUAL = 0.5;
 
 // Per-enemy-type auto-scale: longest texture side auto-shrinks to fit.
 // Unlisted types use the default FIT_MAX (512).
