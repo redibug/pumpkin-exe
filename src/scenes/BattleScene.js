@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { COLS, ROWS, project, tileCorners, tileFeet, tileCenter, isPlayerTile, gridParams, setGridParams, getGridParams, hexToRgb } from '../systems/grid.js';
 import { CHIP_MAP, DECK, BOSS } from '../systems/chips.js';
 import { RUTABAGA_MANDRAKE } from '../systems/viruses.js';
-import { fitFactor } from '../systems/spriteFit.js';
+import { fitFactor, FIT_MAX } from '../systems/spriteFit.js';
 import { createDebugOverlay } from '../systems/debugOverlay.js';
 import { DialogueUI, SCRIPTS } from '../systems/dialogue.js';
 
@@ -20,6 +20,12 @@ const SKITTER = {
   bulletColor: 0x9dbb2e,  // sickly yellow-green ichor
 };
 const SKITTER_MANUAL = 0.85;
+
+// Per-enemy-type auto-scale: longest texture side auto-shrinks to fit.
+// Unlisted types use the default FIT_MAX (512).
+const AUTOSCALE = {
+  skitterbug: 120,
+};
 
 // ---- battles ----
 // Mel: edit freely — enemy comps, names, dialogue. Simple words, short lines.
@@ -262,6 +268,7 @@ export default class BattleScene extends Phaser.Scene {
   spawnPumpkin(col, row) {
     const bp = tileFeet(col, row);
     const sprite = this.physics.add.sprite(bp.x, bp.y, 'boss');
+    sprite.setData('fitMax', AUTOSCALE.pumpkin ?? FIT_MAX);
     sprite.setOrigin(0.5, 1); // viruses stand on their tiles too
     this.placeFighter(sprite, col, row, BOSS_MANUAL);
     const enemy = {
@@ -280,6 +287,7 @@ export default class BattleScene extends Phaser.Scene {
     const mound = this.add.ellipse(mp.x, mp.y - 8, 70, 26, 0x5d3a1a);
     mound.setScale(mp.s).setDepth(9 + row);
     const sprite = this.physics.add.sprite(mp.x, mp.y, 'mandrake').setVisible(false);
+    sprite.setData('fitMax', AUTOSCALE.mandrake ?? FIT_MAX);
     sprite.setOrigin(0.5, 1);
     if (big) sprite.setTint(0xffab91); // big one: slightly red tint
     this.placeFighter(sprite, col, row, MANDRAKE_MANUAL * (big ? 1.35 : 1));
@@ -297,6 +305,7 @@ export default class BattleScene extends Phaser.Scene {
 
   spawnSkitterbug(col, row) {
     const sprite = this.physics.add.sprite(0, 0, 'skitterbug');
+    sprite.setData('fitMax', AUTOSCALE.skitterbug ?? FIT_MAX);
     sprite.setOrigin(0.5, 1);
     this.placeFighter(sprite, col, row, SKITTER_MANUAL);
     const enemy = {

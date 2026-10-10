@@ -1,8 +1,10 @@
 // spriteFit.js — TEMPORARY jam helper: auto-shrink oversized sprites.
 //
-// Any sprite whose longest texture side exceeds FIT_MAX px is scaled down
-// to fit, so huge art files can't blow up the screen. An optional manual
-// multiplier preserves artistic scaling on top of the fit.
+// Any sprite whose longest texture side exceeds its fit max is scaled down
+// to fit, so huge art files can't blow up the screen. The fit max defaults
+// to FIT_MAX but can be overridden per sprite via `sprite.setData('fitMax', n)`
+// (e.g. per enemy type). An optional manual multiplier preserves artistic
+// scaling on top of the fit.
 //
 // Deliberately decoupled: to remove this system later, delete this file and
 // replace each `fitSprite(sprite, s)` call with `sprite.setScale(s)`.
@@ -10,12 +12,14 @@
 export const FIT_MAX = 512;
 
 /**
- * Fit factor for a sprite's texture: shrinks it within FIT_MAX px if the
- * longest texture side exceeds it, else 1. Does not touch the sprite.
+ * Fit factor for a sprite's texture: shrinks it within its fit max
+ * (`sprite.getData('fitMax')`, default FIT_MAX) if the longest texture side
+ * exceeds it, else 1. Does not touch the sprite.
  */
 export function fitFactor(sprite) {
+  const fitMax = sprite.getData('fitMax') ?? FIT_MAX;
   const longest = Math.max(sprite.width, sprite.height);
-  return longest > FIT_MAX ? FIT_MAX / longest : 1;
+  return longest > fitMax ? fitMax / longest : 1;
 }
 
 /**
