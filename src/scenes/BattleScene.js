@@ -256,26 +256,23 @@ export default class BattleScene extends Phaser.Scene {
     return enemy;
   }
 
-  // small HP bar that floats above an enemy sprite
+  // HP number floating above an enemy's head
   makeHpBar() {
-    const bg = this.add.rectangle(0, 0, 64, 8, 0x1a1a2e).setDepth(30);
-    const fill = this.add.rectangle(0, 0, 64, 8, 0x81c784).setDepth(31);
-    bg.setOrigin(0.5); fill.setOrigin(0.5);
-    return { bg, fill };
+    return this.add.text(0, 0, '', {
+      fontFamily: 'monospace', fontSize: '18px', color: '#ffffff',
+      stroke: '#000000', strokeThickness: 3,
+    }).setOrigin(0.5).setDepth(30);
   }
 
   updateHpBar(enemy) {
-    const { bg, fill } = enemy.hpBar;
+    const t = enemy.hpBar;
     // only show for hittable enemies (mandrakes hide while burrowed)
     const show = enemy.alive && (enemy.type !== 'mandrake' || enemy.state === 'emerged');
-    if (!show) { bg.setVisible(false); fill.setVisible(false); return; }
-    bg.setVisible(true); fill.setVisible(true);
+    t.setVisible(show);
+    if (!show) return;
     const s = enemy.sprite;
-    bg.setPosition(s.x, s.y - s.displayHeight - 12);
-    fill.setPosition(s.x, s.y - s.displayHeight - 12);
-    const frac = Math.max(enemy.hp / enemy.maxHp, 0);
-    fill.setDisplaySize(64 * frac, 8);
-    fill.setFillStyle(frac > 0.5 ? 0x81c784 : frac > 0.25 ? 0xffb74d : 0xff5252);
+    t.setPosition(s.x, s.y - s.displayHeight - 14);
+    t.setText(`${enemy.hp}`);
   }
 
   // ================= dialogue + pause =================
