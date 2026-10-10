@@ -890,18 +890,20 @@ export default class BattleScene extends Phaser.Scene {
     });
   }
 
-  // Dissolve a sprite top-to-bottom when it's deleted. Slices the current
-  // frame into horizontal strips; a flickering dissolve band wipes down,
-  // strips above it vanish, strips below stay solid until the band reaches
-  // them. Pixels scatter slightly upward as they dissolve.
+  // Dissolve a sprite into square pixel chunks when it's deleted. The chunk
+  // size adapts to the sprite's on-screen dimensions (target ~8px per chunk),
+  // so big sprites dissolve finer and small sprites coarser. Chunks wipe
+  // top-to-bottom with randomness, flickering at the frontier.
   dissolveSprite(sprite, onDone) {
-    const STRIPS = 24;
     const DURATION = 500;
+    const TARGET_PX = 8; // target on-screen chunk size
 
     const frame = sprite.frame;
     const fw = frame.width, fh = frame.height;
-    const sh = fh / STRIPS;
     const scaleX = sprite.scaleX, scaleY = sprite.scaleY;
+    const cols = Phaser.Math.Clamp(Math.round((fw * scaleX) / TARGET_PX), 4, 40);
+    const rows = Phaser.Math.Clamp(Math.round((fh * scaleY) / TARGET_PX), 4, 40);
+    const cw = fw / cols, ch = fh / rows;
     const ox = sprite.x, oy = sprite.y;
     const key = sprite.texture.key;
     const frameName = frame.name;
@@ -909,12 +911,18 @@ export default class BattleScene extends Phaser.Scene {
 
     sprite.setVisible(false);
 
-    const strips = [];
-    for (let i = 0; i < STRIPS; i++) {
-      const img = this.add.image(ox, oy, key, frameName);
-      img.setOrigin(0.5, 1).setScale(scaleX, scaleY).setDepth(depth + 1);
-      img.setCrop(0, i * sh, fw, sh);
-      strips.push(img);
+    const chunks = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        // chunk center in sprite-local coords (origin 0.5,1 => bottom-center at 0,0)
+        const lx = (c * cw + cw / 2 - fw / 2) * scaleX;
+        const ly = (r * ch + ch / 2 - fh) * scaleY;
+        const img = this.add.image(ox + lx, oy + ly, key, frameName);
+        img.setOrigin(0.5, 0.5).setScale(scaleX, scaleY).setDepth(depth + 1);
+        img.setCrop(c * cw, r * ch, cw, ch);
+        // dissolve time: top rows first, plus randomness for the pixel look
+        chunks.push({ img, dissolveAt: (r / rows) * 0.65 + Math.random() * 0.35 });
+      }
     }
 
     const progress = { t: 0 };
@@ -924,26 +932,19 @@ export default class BattleScene extends Phaser.Scene {
       duration: DURATION,
       ease: 'Quad.easeIn',
       onUpdate: () => {
-        const wipe = progress.t * (STRIPS + 4); // +4 so the band clears the bottom
-        for (let i = 0; i < STRIPS; i++) {
-          const st = strips[i];
-          const d = i - wipe; // <0 above frontier, 0..4 in band, >4 below
-          if (d < 0) {
-            st.setVisible(false);
-          } else if (d < 4) {
-            // dissolve band: flicker + scatter upward
-            st.setVisible(Math.random() > 0.45);
-            st.y = oy - Math.random() * 6 * (1 - d / 4);
-            st.setAlpha(0.4 + Math.random() * 0.6);
+        for (const ch of chunks) {
+          const d = ch.dissolveAt - progress.t;
+          if (d <= 0) {
+            ch.img.setVisible(false);
+          } else if (d < 0.07) {
+            ch.img.setVisible(Math.random() > 0.5); // flicker at the frontier
           } else {
-            st.setVisible(true);
-            st.setAlpha(1);
-            st.y = oy;
+            ch.img.setVisible(true);
           }
         }
       },
       onComplete: () => {
-        for (const st of strips) st.destroy();
+        for (const ch of chunks) ch.img.destroy();
         if (onDone) onDone();
       },
     });
