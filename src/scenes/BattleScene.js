@@ -1071,27 +1071,34 @@ export default class BattleScene extends Phaser.Scene {
     sprite.setDepth(10 + r);
   }
 
-  // Blob shadow: semi-translucent squished ellipse on the tile, marks exactly
-  // which tile the fighter stands on (reduces positional uncertainty).
+  // Blob shadow: semi-translucent squished ellipse at the CENTER of the tile,
+  // marks exactly which tile the fighter stands on. Scaled by perspective.
   makeBlobShadow(sprite) {
-    const w = Math.max(sprite.displayWidth * 0.75, 40);
-    const shadow = this.add.ellipse(sprite.x, sprite.y + 4, w, w * 0.28, 0x000000, 0.35);
-    shadow.setDepth(sprite.depth - 0.5);
+    // initial size; syncShadows updates position/size every frame
+    const shadow = this.add.ellipse(0, 0, 60, 17, 0x000000, 0.35);
+    shadow.setDepth(9);
     return shadow;
   }
 
   syncShadows() {
+    const SHADOW_W = 75; // base width at perspective scale 1
     // navi
     if (this.naviShadow) {
-      this.naviShadow.setPosition(this.navi.x, this.navi.y + 4);
-      this.naviShadow.setDepth(this.navi.depth - 0.5);
+      const p = tileCenter(this.naviPos.col, this.naviPos.row);
+      const w = SHADOW_W * p.s;
+      this.naviShadow.setPosition(p.x, p.y);
+      this.naviShadow.setDisplaySize(w, w * 0.28);
+      this.naviShadow.setDepth(9 + this.naviPos.row);
       this.naviShadow.setVisible(this.navi.visible);
     }
     // enemies
     for (const e of this.enemies) {
       if (!e.shadow) continue;
-      e.shadow.setPosition(e.sprite.x, e.sprite.y + 4);
-      e.shadow.setDepth(e.sprite.depth - 0.5);
+      const p = tileCenter(e.col, e.row);
+      const w = SHADOW_W * p.s;
+      e.shadow.setPosition(p.x, p.y);
+      e.shadow.setDisplaySize(w, w * 0.28);
+      e.shadow.setDepth(9 + e.row);
       e.shadow.setVisible(e.sprite.visible && e.alive);
     }
   }
