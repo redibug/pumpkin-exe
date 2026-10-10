@@ -600,13 +600,18 @@ export default class BattleScene extends Phaser.Scene {
     this.input.on('pointermove', this._customDragMove);
     this.input.on('pointerup', this._customDragUp);
 
+    // ---- Row 1: deck info row ----
+    // (handle with title is above; indicators sit just below it)
+
+    // ---- Row 2: chip row ----
+    // Left column: chip selection, shifted down to clear the indicators.
     // persistent chip cards (built once so select/mark can slide-tween).
     // Layering: icon (label) below, frame on top. The frame is 32x32 with a
     // 22x22 hole at x=[5,26], y=[4,25]; at 64x64 the hole is 44x44 centered
     // at (0,-2), so the icon is 44x44 at (0,-2) to exactly fill it.
     this.customCards = [];
     for (let i = 0; i < HAND_MAX; i++) {
-      const baseX = 72, baseY = 92 + i * 76;
+      const baseX = 72, baseY = 110 + i * 76;
       const root = this.add.container(baseX, baseY);
       const halo = this.add.rectangle(0, 0, 76, 76, 0xffffff, 0.12)
         .setStrokeStyle(2, 0xffffff).setVisible(false);
@@ -638,27 +643,28 @@ export default class BattleScene extends Phaser.Scene {
       this.customCards.push({ root, halo, frame, icon, selText, x1, x2, tint, baseX });
     }
 
-    // detail area: large art + name + desc of the highlighted chip.
+    // Right column: selected chip info (image, name, desc, then OK button).
+    // Shifted down a little for visual balance.
     // The art fits dynamically within 160x160, preserving aspect ratio.
-    this.customDetailImage = this.add.image(265, 150, 'chip-empty');
+    this.customDetailImage = this.add.image(265, 185, 'chip-empty');
     this.fitImageToArea(this.customDetailImage, 160, 160);
-    this.customDetailName = this.add.text(265, 245, '', {
+    this.customDetailName = this.add.text(265, 280, '', {
       fontFamily: 'monospace', fontSize: '20px', color: '#e8f6ff',
     }).setOrigin(0.5);
-    this.customDetailDesc = this.add.text(265, 272, '', {
+    this.customDetailDesc = this.add.text(265, 307, '', {
       fontFamily: 'monospace', fontSize: '13px', color: '#9fb3c8',
       wordWrap: { width: 190 }, align: 'center',
     }).setOrigin(0.5, 0);
     ui.add([this.customDetailImage, this.customDetailName, this.customDetailDesc]);
 
     // deck/discard/selected/marked indicators at the top of the window
-    this.customCountsText = this.add.text(200, 52, '', {
+    this.customCountsText = this.add.text(200, 55, '', {
       fontFamily: 'monospace', fontSize: '12px', color: '#9fb3c8',
     }).setOrigin(0.5);
     ui.add(this.customCountsText);
 
-    // OK button (centered at the bottom now that counts are at the top)
-    const okX = 200, okY = 455;
+    // OK button: centered in the right column, under the chip info
+    const okX = 265, okY = 410;
     this.customOkBg = this.add.rectangle(okX, okY, 110, 36, 0x0d1526)
       .setStrokeStyle(2, 0x00e5ff);
     this.customOkBg.setInteractive({ useHandCursor: true });
@@ -675,6 +681,7 @@ export default class BattleScene extends Phaser.Scene {
     }).setOrigin(0.5);
     ui.add([this.customOkBg, this.customOkLabel]);
 
+    // ---- Row 3: controls row ----
     ui.add(this.add.text(200, 490, 'up/down: move · Z/click: select · X/right-click: discard', {
       fontFamily: 'monospace', fontSize: '10px', color: '#9fb3c8',
     }).setOrigin(0.5));
