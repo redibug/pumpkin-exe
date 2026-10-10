@@ -464,10 +464,11 @@ export default class BattleScene extends Phaser.Scene {
       }
       if (marked) {
         // red highlight + red X: tossed to the discard pile on confirm
+        // (Line geometry renders minus the display origin: setOrigin(0, 0))
         card.add(this.add.rectangle(0, 0, cw, ch, 0xff3b30, 0.16));
         const m = 36;
-        card.add(this.add.line(0, 0, -m, -m, m, m, 0xff3b30).setLineWidth(7));
-        card.add(this.add.line(0, 0, m, -m, -m, m, 0xff3b30).setLineWidth(7));
+        card.add(this.add.line(0, 0, -m, -m, m, m, 0xff3b30).setOrigin(0, 0).setLineWidth(7));
+        card.add(this.add.line(0, 0, m, -m, -m, m, 0xff3b30).setOrigin(0, 0).setLineWidth(7));
       }
       this.customCardLayer.add(card);
     });
@@ -809,7 +810,10 @@ export default class BattleScene extends Phaser.Scene {
       target = 'mandrake'; targetCol = md.pos.col;
     }
     const endX = target ? tileCenter(targetCol, row).x : 930;
-    const beam = this.add.line(0, 0, mx, my, endX, my, 0xfff176).setLineWidth(3).setAlpha(0.9);
+    // NB: Line geometry renders minus the display origin, so setOrigin(0, 0)
+    // or the beam centers on the wrong point.
+    const beam = this.add.line(0, 0, mx, my, endX, my, 0xfff176).setOrigin(0, 0);
+    beam.setLineWidth(3).setAlpha(0.9);
     beam.setDepth(18);
     this.tweens.add({ targets: beam, alpha: 0, duration: 110, onComplete: () => beam.destroy() });
     if (target === 'boss') { this.damageBoss(10); this.flash(this.boss, 0xfff176); }
