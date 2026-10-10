@@ -978,11 +978,14 @@ export default class BattleScene extends Phaser.Scene {
 
   // refresh the 4 slot icons from the current loadout
   updateLoadoutHud() {
-    this.chipIcons.forEach(({ icon }, i) => {
+    this.chipIcons.forEach(({ frame, icon }, i) => {
       const id = this.loadout[i];
+      const loaded = !!id;
+      // only loaded chips get the chip frame; empty slots show the placeholder
+      frame.setVisible(loaded);
       // NB: setTexture keeps the old scale, so re-apply the display size
       // every time (small chip art is 96x96, empty slot is 48x48).
-      icon.setTexture(id ? `chip-${id}-small` : 'chip-empty').setDisplaySize(30, 30);
+      icon.setTexture(loaded ? `chip-${id}-small` : 'chip-empty').setDisplaySize(30, 30);
     });
   }
 
