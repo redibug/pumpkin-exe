@@ -612,13 +612,14 @@ export default class BattleScene extends Phaser.Scene {
         .setStrokeStyle(2, 0xffffff).setVisible(false);
       const icon = this.add.image(0, -2, 'chip-empty').setDisplaySize(44, 44);
       const frame = this.add.image(0, 0, 'chip-frame').setDisplaySize(64, 64);
-      const selText = this.add.text(-42, 0, '', {
+      // selection order + discard X live in the top-left corner of the chip
+      const selText = this.add.text(-26, -28, '', {
         fontFamily: 'monospace', fontSize: '18px', color: '#00e5ff',
       }).setOrigin(0.5).setVisible(false);
-      // red X for marked (discard)
-      const m = 26;
-      const x1 = this.add.line(0, 0, -m, -m, m, m, 0xff3b30).setOrigin(0, 0).setLineWidth(6).setVisible(false);
-      const x2 = this.add.line(0, 0, m, -m, -m, m, 0xff3b30).setOrigin(0, 0).setLineWidth(6).setVisible(false);
+      // red X for marked (discard): small badge in the corner
+      const m = 10;
+      const x1 = this.add.line(-24, -24, -m, -m, m, m, 0xff3b30).setOrigin(0, 0).setLineWidth(5).setVisible(false);
+      const x2 = this.add.line(-24, -24, m, -m, -m, m, 0xff3b30).setOrigin(0, 0).setLineWidth(5).setVisible(false);
       const tint = this.add.rectangle(0, 0, 64, 64, 0xff3b30, 0.15).setVisible(false);
       root.add([halo, icon, frame, tint, x1, x2, selText]);
       frame.setInteractive({ useHandCursor: true });
