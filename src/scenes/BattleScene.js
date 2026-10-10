@@ -11,6 +11,69 @@ import { DialogueUI, SCRIPTS } from '../systems/dialogue.js';
 
 const M = RUTABAGA_MANDRAKE;
 
+// ---- battles ----
+// Mel: edit freely — enemy comps, names, dialogue. Simple words, short lines.
+const BATTLES = [
+  {
+    name: 'SPROUT PATROL',
+    enemies: [
+      { type: 'mandrake', col: 4, row: 0 },
+      { type: 'mandrake', col: 4, row: 2 },
+    ],
+    intro: [
+      { speaker: 'mel', text: 'Bugchan, I jacked you in. Two rutabaga viruses are digging around in there.' },
+      { speaker: 'bugchan', text: 'Smells like dirt! I will debug these roots!' },
+      { speaker: 'mandrake', text: 'KYAAAH!!' },
+    ],
+    victory: [
+      { speaker: 'bugchan', text: 'Two down! That was easy!' },
+    ],
+    story: [
+      { speaker: 'mel', text: 'Good work. But I see more signals deeper in. Keep going.' },
+      { speaker: 'bugchan', text: 'Deeper? It smells worse down there...' },
+    ],
+  },
+  {
+    name: 'ROOT CELLAR',
+    enemies: [
+      { type: 'mandrake', col: 3, row: 0 },
+      { type: 'mandrake', col: 5, row: 1, big: true },
+      { type: 'mandrake', col: 3, row: 2 },
+    ],
+    intro: [
+      { speaker: 'mel', text: 'Three this time. The big one in the middle looks mean.' },
+      { speaker: 'bugchan', text: 'Big root, big problems! Chips ready, Mel!' },
+      { speaker: 'mandrake', text: 'KYAAAH!!' },
+    ],
+    victory: [
+      { speaker: 'bugchan', text: 'Phew! The big one almost got me!' },
+    ],
+    story: [
+      { speaker: 'mel', text: 'One signal left. It is huge. Be careful, Bugchan.' },
+      { speaker: 'bugchan', text: 'Huge? Like... pumpkin huge?' },
+      { speaker: 'pumpkin', text: 'I AM PUMPKIN.EXE! THIS HARVEST IS MINE, LITTLE BUG!' },
+    ],
+  },
+  {
+    name: 'PUMPKIN.EXE',
+    enemies: [
+      { type: 'pumpkin', col: 4, row: 1 },
+      { type: 'mandrake', col: 5, row: 0 },
+    ],
+    intro: [
+      { speaker: 'mel', text: 'Bugchan, I jacked you into the cyberworld. Something is wrong in there...' },
+      { speaker: 'bugchan', text: 'Whoa! Pumpkins everywhere! And they look mad!' },
+      { speaker: 'pumpkin', text: 'I AM PUMPKIN.EXE! THIS HARVEST IS MINE, LITTLE BUG!' },
+      { speaker: 'bugchan', text: 'Not on my watch! Mel, send chips! I will debug this gourd!' },
+    ],
+    victory: [
+      { speaker: 'pumpkin', text: 'NO... MY HARVEST... ROTTING...' },
+      { speaker: 'bugchan', text: 'Virus deleted! Good work, Mel!' },
+    ],
+    story: [], // last battle: no story after, goes to ending
+  },
+];
+
 // Manual artistic scales on top of the auto-fit + perspective scale.
 const NAVI_MANUAL = 1;
 const BOSS_MANUAL = 0.5;
@@ -37,6 +100,10 @@ export default class BattleScene extends Phaser.Scene {
     super('Battle');
   }
 
+  init(data) {
+    this.battleIndex = data.battleIndex || 0;
+  }
+
   preload() {
     this.load.image('tile-player', 'assets/tiles/tile-player.png');
     this.load.image('tile-enemy', 'assets/tiles/tile-enemy.png');
@@ -60,10 +127,10 @@ export default class BattleScene extends Phaser.Scene {
     // ---- state ----
     this.naviHp = 100; this.naviMaxHp = 100;
     this.naviPos = { col: 1, row: 1 };
-    this.bossHp = BOSS.maxHp;
-    this.bossPos = { col: 4, row: 1 };
     this.projectiles = this.add.group(); // tile-based collision, no physics
     this.shootReadyAt = 0; // buster hitscan fire rate gate
+    this.enemies = []; // {type, sprite, col, row, hp, maxHp, alive, ...}
+    this.mandrakeGagged = false; // first-emerge gag plays once per battle
 
     // ---- custom screen / deck state ----
     this.deck = Phaser.Utils.Array.Shuffle([...DECK]);
@@ -73,14 +140,7 @@ export default class BattleScene extends Phaser.Scene {
     this.customTimer = 0;
     this.customOpen = false;
 
-    // mandrake state machine
-    this.mandrake = {
-      hp: M.maxHp, alive: true,
-      state: 'burrowed', // burrowed | telegraph | emerged
-      timer: 0,
-      pos: { col: 3, row: 2 },
-      gagged: false,
-    };
+    // mandrake state machine (per-enemy; see spawnMandrake)
 
     // ---- presentation ----
     this.add.image(480, 270, 'bg').setDisplaySize(960, 540).setDepth(-10);
@@ -101,20 +161,14 @@ export default class BattleScene extends Phaser.Scene {
     this.navi.setOrigin(0.5, 1); // feet at the tile: she stands ON it
     this.placeFighter(this.navi, this.naviPos.col, this.naviPos.row, NAVI_MANUAL);
 
-    const bp = tileFeet(this.bossPos.col, this.bossPos.row);
-    this.boss = this.physics.add.sprite(bp.x, bp.y, 'boss');
-    this.boss.setOrigin(0.5, 1); // viruses stand on their tiles too
-    this.placeFighter(this.boss, this.bossPos.col, this.bossPos.row, BOSS_MANUAL);
-
-    // mandrake: dirt mound (burrowed) + hidden sprite
-    const mp = tileFeet(this.mandrake.pos.col, this.mandrake.pos.row);
-    this.mound = this.add.ellipse(mp.x, mp.y - 8, 70, 26, 0x5d3a1a);
-    this.mound.setScale(mp.s).setDepth(9 + this.mandrake.pos.row);
-    this.mandrakeSprite = this.physics.add.sprite(mp.x, mp.y, 'mandrake').setVisible(false);
-    this.mandrakeSprite.setOrigin(0.5, 1);
-    this.placeFighter(this.mandrakeSprite, this.mandrake.pos.col, this.mandrake.pos.row, MANDRAKE_MANUAL);
-    // NB: mandrake.timer + boss AI timers are armed when the intro
-    // dialogue finishes, so the battle doesn't run during the cutscene.
+    // spawn this battle's enemies from the config
+    const battle = BATTLES[this.battleIndex];
+    for (const e of battle.enemies) {
+      if (e.type === 'pumpkin') this.spawnPumpkin(e.col, e.row);
+      else if (e.type === 'mandrake') this.spawnMandrake(e.col, e.row, e.big);
+    }
+    // NB: enemy AI timers are armed when the intro dialogue finishes, so
+    // the battle doesn't run during the cutscene.
 
     // ---- debug overlay (TEMPORARY): live perspective tuning ----
     this.debugOverlay = createDebugOverlay({
@@ -145,17 +199,83 @@ export default class BattleScene extends Phaser.Scene {
     // ---- dialogue ----
     this.dialogue = new DialogueUI(this);
 
-    this.add.text(480, 20, `${BOSS.name}  HP: ${this.bossHp}/${BOSS.maxHp}`, {
+    this.add.text(480, 20, `${battle.name}`, {
       fontFamily: 'monospace', fontSize: '20px', color: '#ffb74d',
-    }).setOrigin(0.5).setName('bossHpText');
+    }).setOrigin(0.5).setName('battleNameText');
 
     // battle intro; the custom screen opens first, then the fight starts
-    this.startDialogue(SCRIPTS.intro, () => {
-      this.nextBossMove = this.time.now + 1400;
-      this.nextBossAttack = this.time.now + 2200;
-      this.mandrake.timer = this.time.now + M.burrowedMs;
+    this.startDialogue(battle.intro, () => {
+      const now = this.time.now;
+      for (const e of this.enemies) {
+        if (e.type === 'pumpkin') {
+          e.nextMove = now + 1400;
+          e.nextAttack = now + 2200;
+        } else if (e.type === 'mandrake') {
+          e.timer = now + M.burrowedMs;
+        }
+      }
       this.openCustom(); // MMBN-style: every battle starts at the custom screen
     });
+  }
+
+  // ================= enemies =================
+
+  spawnPumpkin(col, row) {
+    const bp = tileFeet(col, row);
+    const sprite = this.physics.add.sprite(bp.x, bp.y, 'boss');
+    sprite.setOrigin(0.5, 1); // viruses stand on their tiles too
+    this.placeFighter(sprite, col, row, BOSS_MANUAL);
+    const enemy = {
+      type: 'pumpkin', sprite, col, row,
+      hp: BOSS.maxHp, maxHp: BOSS.maxHp, alive: true,
+      nextMove: 0, nextAttack: 0,
+      hpBar: this.makeHpBar(),
+    };
+    this.enemies.push(enemy);
+    return enemy;
+  }
+
+  spawnMandrake(col, row, big = false) {
+    const mp = tileFeet(col, row);
+    // dirt mound (burrowed) + hidden sprite
+    const mound = this.add.ellipse(mp.x, mp.y - 8, 70, 26, 0x5d3a1a);
+    mound.setScale(mp.s).setDepth(9 + row);
+    const sprite = this.physics.add.sprite(mp.x, mp.y, 'mandrake').setVisible(false);
+    sprite.setOrigin(0.5, 1);
+    if (big) sprite.setTint(0xffab91); // big one: slightly red tint
+    this.placeFighter(sprite, col, row, MANDRAKE_MANUAL * (big ? 1.35 : 1));
+    const maxHp = big ? M.maxHp * 2 : M.maxHp;
+    const enemy = {
+      type: 'mandrake', sprite, mound, col, row,
+      hp: maxHp, maxHp, alive: true, big,
+      state: 'burrowed', // burrowed | telegraph | emerged
+      timer: 0, warnRect: null,
+      hpBar: this.makeHpBar(),
+    };
+    this.enemies.push(enemy);
+    return enemy;
+  }
+
+  // small HP bar that floats above an enemy sprite
+  makeHpBar() {
+    const bg = this.add.rectangle(0, 0, 64, 8, 0x1a1a2e).setDepth(30);
+    const fill = this.add.rectangle(0, 0, 64, 8, 0x81c784).setDepth(31);
+    bg.setOrigin(0.5); fill.setOrigin(0.5);
+    return { bg, fill };
+  }
+
+  updateHpBar(enemy) {
+    const { bg, fill } = enemy.hpBar;
+    // only show for hittable enemies (mandrakes hide while burrowed)
+    const show = enemy.alive && (enemy.type !== 'mandrake' || enemy.state === 'emerged');
+    if (!show) { bg.setVisible(false); fill.setVisible(false); return; }
+    bg.setVisible(true); fill.setVisible(true);
+    const s = enemy.sprite;
+    bg.setPosition(s.x, s.y - s.displayHeight - 12);
+    fill.setPosition(s.x, s.y - s.displayHeight - 12);
+    const frac = Math.max(enemy.hp / enemy.maxHp, 0);
+    fill.setDisplaySize(64 * frac, 8);
+    fill.setFillStyle(frac > 0.5 ? 0x81c784 : frac > 0.25 ? 0xffb74d : 0xff5252);
   }
 
   // ================= dialogue + pause =================
@@ -187,10 +307,11 @@ export default class BattleScene extends Phaser.Scene {
       this._pausedTweens.forEach((t) => { t.paused = true; });
     } else {
       const pausedMs = this.time.now - (this.pauseStart || this.time.now);
-      for (const key of ['nextBossMove', 'nextBossAttack']) {
-        if (Number.isFinite(this[key])) this[key] += pausedMs;
+      for (const e of this.enemies) {
+        for (const key of ['nextMove', 'nextAttack', 'timer']) {
+          if (Number.isFinite(e[key])) e[key] += pausedMs;
+        }
       }
-      if (Number.isFinite(this.mandrake.timer)) this.mandrake.timer += pausedMs;
       if (Number.isFinite(this._lastMove)) this._lastMove += pausedMs;
       if (Number.isFinite(this.shootReadyAt)) this.shootReadyAt += pausedMs;
       this.physics.world.resume();
@@ -615,12 +736,15 @@ export default class BattleScene extends Phaser.Scene {
     if (this.gridGraphics) this.gridGraphics.destroy();
     this.drawGrid();
     this.placeFighter(this.navi, this.naviPos.col, this.naviPos.row, NAVI_MANUAL);
-    this.placeFighter(this.boss, this.bossPos.col, this.bossPos.row, BOSS_MANUAL);
-    if (this.mandrakeSprite.visible) {
-      this.placeFighter(this.mandrakeSprite, this.mandrake.pos.col, this.mandrake.pos.row, MANDRAKE_MANUAL);
+    for (const e of this.enemies) {
+      const manual = e.type === 'pumpkin' ? BOSS_MANUAL : MANDRAKE_MANUAL * (e.big ? 1.35 : 1);
+      if (e.type === 'mandrake' && !e.sprite.visible) continue;
+      this.placeFighter(e.sprite, e.col, e.row, manual);
+      if (e.type === 'mandrake') {
+        const mp = tileFeet(e.col, e.row);
+        e.mound.setPosition(mp.x, mp.y - 8).setScale(mp.s).setDepth(9 + e.row);
+      }
     }
-    const mp = tileFeet(this.mandrake.pos.col, this.mandrake.pos.row);
-    this.mound.setPosition(mp.x, mp.y - 8).setScale(mp.s).setDepth(9 + this.mandrake.pos.row);
   }
 
   // One glassy tile slab, matching battle-mockup.png: vertical glass
@@ -743,8 +867,8 @@ export default class BattleScene extends Phaser.Scene {
     this.handleMovement(time);
     this.handleChips(time);
     this.updateProjectiles(delta);
-    this.bossAI(time);
-    this.mandrakeAI(time);
+    this.updateEnemies(time);
+    for (const e of this.enemies) this.updateHpBar(e);
     this.updateHud(time);
     this.checkEnd();
   }
@@ -812,15 +936,14 @@ export default class BattleScene extends Phaser.Scene {
     const s = this.navi.scaleX;
     const mx = this.navi.x + 45 * s, my = this.navi.y - 115 * s;
     this.showMuzzleFlash(mx, my, row);
+    // first alive enemy ahead on the navi's row (any type)
     let target = null, targetCol = 99;
-    if (this.bossHp > 0 && this.bossPos.row === row
-      && this.bossPos.col > this.naviPos.col && this.bossPos.col < targetCol) {
-      target = 'boss'; targetCol = this.bossPos.col;
-    }
-    const md = this.mandrake;
-    if (md.alive && md.state === 'emerged' && md.pos.row === row
-      && md.pos.col > this.naviPos.col && md.pos.col < targetCol) {
-      target = 'mandrake'; targetCol = md.pos.col;
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      if (e.type === 'mandrake' && e.state !== 'emerged') continue;
+      if (e.row === row && e.col > this.naviPos.col && e.col < targetCol) {
+        target = e; targetCol = e.col;
+      }
     }
     const endX = target ? tileCenter(targetCol, row).x : 930;
     // NB: Line geometry renders minus the display origin, so setOrigin(0, 0)
@@ -829,8 +952,7 @@ export default class BattleScene extends Phaser.Scene {
     beam.setLineWidth(3).setAlpha(0.9);
     beam.setDepth(10 + row); // row-ordered like the other battle effects
     this.tweens.add({ targets: beam, alpha: 0, duration: 110, onComplete: () => beam.destroy() });
-    if (target === 'boss') { this.damageBoss(10); this.flash(this.boss, 0xfff176); }
-    else if (target === 'mandrake') { this.damageMandrake(10); this.flash(this.mandrakeSprite, 0xfff176); }
+    if (target) { this.damageEnemy(target, 10); this.flash(target.sprite, 0xfff176); }
   }
 
   // Punch frame for the buster. Mel is drawing the real punch frame +
@@ -882,15 +1004,13 @@ export default class BattleScene extends Phaser.Scene {
 
     if (chip.id === 'sword') {
       const target = { col: this.naviPos.col + 1, row: this.naviPos.row };
-      let hit = false;
-      if (target.col === this.bossPos.col && target.row === this.bossPos.row && this.bossHp > 0) {
-        this.damageBoss(chip.damage); hit = true;
+      for (const e of this.enemies) {
+        if (!e.alive) continue;
+        if (e.type === 'mandrake' && e.state !== 'emerged') continue;
+        if (target.col === e.col && target.row === e.row) {
+          this.damageEnemy(e, chip.damage);
+        }
       }
-      const md = this.mandrake;
-      if (md.alive && md.state === 'emerged' && target.col === md.pos.col && target.row === md.pos.row) {
-        this.damageMandrake(chip.damage); hit = true;
-      }
-      if (hit) this.flash(this.boss, chip.color);
       // sword arc flash on the target tile
       const arc = this.highlightTile(target.col, target.row, chip.color, 0.35);
       this.time.delayedCall(140, () => arc.destroy());
@@ -927,44 +1047,50 @@ export default class BattleScene extends Phaser.Scene {
       if (!proj.active) continue;
       proj.x += proj.getData('vx') * dt;
       if (proj.x > 1020) { proj.destroy(); continue; }
-      if (this.bossHp > 0 && this.projOverlapsTile(proj, this.bossPos.col, this.bossPos.row)) {
-        this.damageBoss(proj.getData('damage'));
-        proj.destroy();
-        continue;
-      }
-      const md = this.mandrake;
-      if (md.alive && md.state === 'emerged' && this.projOverlapsTile(proj, md.pos.col, md.pos.row)) {
-        this.damageMandrake(proj.getData('damage'));
-        proj.destroy();
+      for (const e of this.enemies) {
+        if (!e.alive) continue;
+        if (e.type === 'mandrake' && e.state !== 'emerged') continue;
+        if (this.projOverlapsTile(proj, e.col, e.row)) {
+          this.damageEnemy(e, proj.getData('damage'));
+          proj.destroy();
+          break;
+        }
       }
     }
   }
 
-  // ================= boss AI =================
+  // ================= enemy AI =================
 
-  bossPhase() {
-    const frac = this.bossHp / BOSS.maxHp;
+  updateEnemies(time) {
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      if (e.type === 'pumpkin') this.pumpkinAI(e, time);
+      else if (e.type === 'mandrake') this.mandrakeAI(e, time);
+    }
+  }
+
+  bossPhase(enemy) {
+    const frac = enemy.hp / enemy.maxHp;
     if (frac < 0.3) return BOSS.phases[2]; // Harvest
     if (frac < 0.6) return BOSS.phases[1];  // Vine
     return BOSS.phases[0];                  // Sprout
   }
 
-  bossAI(time) {
-    if (this.bossHp <= 0) return;
-    const phase = this.bossPhase();
+  pumpkinAI(e, time) {
+    const phase = this.bossPhase(e);
 
     // wander enemy columns
-    if (time >= this.nextBossMove) {
-      this.nextBossMove = time + phase.moveIntervalMs;
+    if (time >= e.nextMove) {
+      e.nextMove = time + phase.moveIntervalMs;
       const nc = Phaser.Math.Between(3, 5);
       const nr = Phaser.Math.Between(0, ROWS - 1);
-      this.bossPos = { col: nc, row: nr };
-      this.teleportMove(this.boss, nc, nr, BOSS_MANUAL);
+      e.col = nc; e.row = nr;
+      this.teleportMove(e.sprite, nc, nr, BOSS_MANUAL);
     }
 
     // telegraphed tile slam on the navi's tile
-    if (time >= this.nextBossAttack) {
-      this.nextBossAttack = time + phase.attackIntervalMs;
+    if (time >= e.nextAttack) {
+      e.nextAttack = time + phase.attackIntervalMs;
       const target = { col: this.naviPos.col, row: this.naviPos.row };
       const warn = this.highlightTile(target.col, target.row, 0xff5252, 0.4);
       this.time.delayedCall(700, () => {
@@ -985,59 +1111,60 @@ export default class BattleScene extends Phaser.Scene {
 
   // ================= mandrake AI =================
 
-  mandrakeAI(time) {
-    const md = this.mandrake;
+  mandrakeAI(md, time) {
     if (!md.alive || time < md.timer) return;
+    const manual = MANDRAKE_MANUAL * (md.big ? 1.35 : 1);
 
     if (md.state === 'burrowed') {
       // start telegraph: flash its tile
       md.state = 'telegraph';
       md.timer = time + M.telegraphMs;
-      md.warnRect = this.highlightTile(md.pos.col, md.pos.row, 0xba68c8, 0.45);
+      md.warnRect = this.highlightTile(md.col, md.row, 0xba68c8, 0.45);
       this.tweens.add({ targets: md.warnRect, alpha: 0.1, duration: 120, yoyo: 5 });
     } else if (md.state === 'telegraph') {
       // EMERGE
       if (md.warnRect) { md.warnRect.destroy(); md.warnRect = null; }
       md.state = 'emerged';
       md.timer = time + M.emergedMs;
-      this.mound.setVisible(false);
-      this.mandrakeSprite.setVisible(true);
-      this.placeFighter(this.mandrakeSprite, md.pos.col, md.pos.row, MANDRAKE_MANUAL);
-      const targetScale = this.mandrakeSprite.scaleX;
-      this.mandrakeSprite.setScale(targetScale * 0.18);
-      this.tweens.add({ targets: this.mandrakeSprite, scaleX: targetScale, scaleY: targetScale, duration: 180, ease: 'Back.easeOut' });
-      if (!md.gagged) {
-        md.gagged = true;
+      md.mound.setVisible(false);
+      md.sprite.setVisible(true);
+      this.placeFighter(md.sprite, md.col, md.row, manual);
+      const targetScale = md.sprite.scaleX;
+      md.sprite.setScale(targetScale * 0.18);
+      this.tweens.add({ targets: md.sprite, scaleX: targetScale, scaleY: targetScale, duration: 180, ease: 'Back.easeOut' });
+      if (!this.mandrakeGagged) {
+        this.mandrakeGagged = true;
         this.startDialogue(SCRIPTS.mandrakeGag);
       }
     } else if (md.state === 'emerged') {
       // SCREAM — row-wide noise attack
       md.state = 'burrowed';
       md.timer = time + M.burrowedMs;
-      const rowC = tileCenter(md.pos.col, md.pos.row);
+      const rowC = tileCenter(md.col, md.row);
       // scream wave visual across the row, following the perspective
-      const left = project(0, md.pos.row + 0.5);
-      const right = project(6, md.pos.row + 0.5);
+      const left = project(0, md.row + 0.5);
+      const right = project(6, md.row + 0.5);
       const wave = this.add.rectangle((left.x + right.x) / 2, rowC.y, right.x - left.x, 40, 0xba68c8, 0.35);
-      wave.setDepth(10 + md.pos.row); // above the floor, ordered by row
+      wave.setDepth(10 + md.row); // above the floor, ordered by row
       this.tweens.add({ targets: wave, alpha: 0, x: left.x - 40, duration: 350,
         onComplete: () => wave.destroy() });
       this.add.text(rowC.x, rowC.y - 70, 'KYAAAH!!', {
         fontFamily: 'monospace', fontSize: '22px', color: '#ba68c8',
-      }).setOrigin(0.5).setDepth(10 + md.pos.row).setName('screamText');
+      }).setOrigin(0.5).setDepth(10 + md.row).setName('screamText');
       this.time.delayedCall(600, () => {
         const t = this.children.getByName('screamText');
         if (t) t.destroy();
       });
-      if (this.naviPos.row === md.pos.row) {
+      if (this.naviPos.row === md.row) {
         this.damageNavi(M.screamDamage);
       }
       // burrow at a new random enemy tile
-      this.mandrakeSprite.setVisible(false);
-      md.pos = { col: Phaser.Math.Between(3, 5), row: Phaser.Math.Between(0, ROWS - 1) };
-      const np = tileFeet(md.pos.col, md.pos.row);
-      this.mound.setPosition(np.x, np.y - 8).setVisible(true);
-      this.mound.setDepth(9 + md.pos.row).setScale(np.s);
+      md.sprite.setVisible(false);
+      md.col = Phaser.Math.Between(3, 5);
+      md.row = Phaser.Math.Between(0, ROWS - 1);
+      const np = tileFeet(md.col, md.row);
+      md.mound.setPosition(np.x, np.y - 8).setVisible(true);
+      md.mound.setDepth(9 + md.row).setScale(np.s);
     }
   }
 
@@ -1048,29 +1175,21 @@ export default class BattleScene extends Phaser.Scene {
     this.time.delayedCall(120, () => { if (target.active) target.clearTint(); });
   }
 
-  damageBoss(amount) {
-    if (this.bossHp <= 0) return;
-    this.bossHp = Math.max(0, this.bossHp - amount);
-    this.flash(this.boss, 0xffffff);
-    const t = this.children.getByName('bossHpText');
-    if (t) t.setText(`${BOSS.name}  HP: ${this.bossHp}/${BOSS.maxHp}`);
-    if (this.bossHp <= 0) {
-      const s0 = this.boss.scaleX;
-      this.tweens.add({ targets: this.boss, alpha: 0, scaleX: s0 * 1.2, scaleY: s0 * 1.2, duration: 400 });
-    }
-  }
-
-  damageMandrake(amount) {
-    const md = this.mandrake;
-    if (!md.alive) return;
-    md.hp = Math.max(0, md.hp - amount);
-    this.flash(this.mandrakeSprite, 0xffffff);
-    if (md.hp <= 0) {
-      md.alive = false;
-      if (md.warnRect) md.warnRect.destroy();
-      const s0 = this.mandrakeSprite.scaleX;
-      this.tweens.add({ targets: this.mandrakeSprite, alpha: 0, scaleX: s0 * 1.45, scaleY: s0 * 1.45, duration: 350,
-        onComplete: () => this.mandrakeSprite.setVisible(false) });
+  damageEnemy(e, amount) {
+    if (!e.alive) return;
+    e.hp = Math.max(0, e.hp - amount);
+    this.flash(e.sprite, 0xffffff);
+    this.updateHpBar(e);
+    if (e.hp <= 0) {
+      e.alive = false;
+      if (e.warnRect) { e.warnRect.destroy(); e.warnRect = null; }
+      if (e.mound) e.mound.setVisible(false);
+      const s0 = e.sprite.scaleX;
+      const grow = e.type === 'pumpkin' ? 1.2 : 1.45;
+      this.tweens.add({ targets: e.sprite, alpha: 0, scaleX: s0 * grow, scaleY: s0 * grow,
+        duration: e.type === 'pumpkin' ? 400 : 350,
+        onComplete: () => e.sprite.setVisible(false) });
+      this.updateHpBar(e); // hides the bar
     }
   }
 
@@ -1094,14 +1213,12 @@ export default class BattleScene extends Phaser.Scene {
   checkEnd() {
     // don't trigger endings twice, or while a script is playing
     if (this.over || this.dialogue.isActive()) return;
-    const bossDead = this.bossHp <= 0;
-    const mandrakeDead = !this.mandrake.alive;
     if (this.naviHp <= 0) {
       this.startDialogue(SCRIPTS.defeat, () => this.showGameOver());
       return;
     }
-    if (bossDead && mandrakeDead) {
-      this.startDialogue(SCRIPTS.victory, () => this.showVictory());
+    if (this.enemies.every((e) => !e.alive)) {
+      this.showVictory();
     }
   }
 
@@ -1113,19 +1230,34 @@ export default class BattleScene extends Phaser.Scene {
     this.add.text(480, 320, 'press R to jack in again', {
       fontFamily: 'monospace', fontSize: '18px', color: '#9fb3c8',
     }).setOrigin(0.5).setDepth(100);
-    this.input.keyboard.once('keydown-R', () => this.scene.restart());
+    // R retries the current battle, not the whole run
+    this.input.keyboard.once('keydown-R', () => this.scene.restart({ battleIndex: this.battleIndex }));
   }
 
   showVictory() {
     this.over = true;
+    const battle = BATTLES[this.battleIndex];
     this.add.text(480, 250, 'VIRUS DELETED', {
       fontFamily: 'monospace', fontSize: '56px', color: '#81c784',
     }).setOrigin(0.5).setDepth(100);
-    this.add.text(480, 320, 'PUMPKIN.EXE + RUTABAGA.MND busted!', {
+    this.add.text(480, 320, `${battle.name} busted!`, {
       fontFamily: 'monospace', fontSize: '18px', color: '#9fb3c8',
     }).setOrigin(0.5).setDepth(100);
-    this.add.text(480, 360, 'thanks for playing! 🎃🥕', {
+    const isLast = this.battleIndex >= BATTLES.length - 1;
+    this.add.text(480, 360, isLast ? 'thanks for playing! 🎃' : 'press Z to continue', {
       fontFamily: 'monospace', fontSize: '18px', color: '#9fb3c8',
     }).setOrigin(0.5).setDepth(100);
+    if (isLast) return;
+    // victory screen -> story segment -> next battle
+    const advance = (e) => {
+      if (e.code !== 'KeyZ' && e.code !== 'Space' && e.code !== 'Enter') return;
+      this.input.keyboard.off('keydown', advance);
+      this.startDialogue(battle.victory, () => {
+        this.startDialogue(battle.story, () => {
+          this.scene.restart({ battleIndex: this.battleIndex + 1 });
+        });
+      });
+    };
+    this.input.keyboard.on('keydown', advance);
   }
 }
