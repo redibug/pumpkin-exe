@@ -890,11 +890,10 @@ export default class BattleScene extends Phaser.Scene {
     });
   }
 
-  // Dissolve a sprite into pixel chunks when it's deleted. Chunks start at
-  // their original positions (intact sprite), lerp outward top-to-bottom,
-  // then delete top-to-bottom with a flicker. Positions use the sprite's
-  // DISPLAYED bounds (displayWidth/Height), not scale math, so the manual
-  // 0.5 scale can't double the spacing.
+  // Dissolve a sprite into pixel chunks when it's deleted. Each chunk is baked
+  // as its own canvas texture (no setCrop), positioned to tile the sprite's
+  // display bounds. Chunks start intact, lerp outward top-to-bottom, then
+  // delete top-to-bottom with a flicker.
   dissolveSprite(sprite, onDone) {
     const DURATION = 700;
     const TARGET_PX = 10;
@@ -904,30 +903,39 @@ export default class BattleScene extends Phaser.Scene {
     const dispW = sprite.displayWidth, dispH = sprite.displayHeight;
     const cols = Phaser.Math.Clamp(Math.round(dispW / TARGET_PX), 3, 30);
     const rows = Phaser.Math.Clamp(Math.round(dispH / TARGET_PX), 3, 30);
-    const cw = fw / cols, ch = fh / rows; // texture px per chunk
-    const chunkW = dispW / cols, chunkH = dispH / rows; // screen px per chunk
+    const cw = Math.ceil(fw / cols), ch = Math.ceil(fh / rows);
+    const chunkW = dispW / cols, chunkH = dispH / rows;
     const ox = sprite.x, oy = sprite.y; // bottom-center (origin 0.5,1)
     const key = sprite.texture.key;
     const depth = sprite.depth;
     const scaleX = sprite.scaleX, scaleY = sprite.scaleY;
+    const srcImg = sprite.texture.getSourceImage();
 
     sprite.setVisible(false);
 
     const chunks = [];
+    const texPrefix = `dissolve-${key}-${Phaser.Utils.String.UUID().slice(0, 8)}`;
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
-        // center of chunk (c,r) in screen coords, tiling the display bounds
+        // bake the chunk region into its own texture
+        const ck = `${texPrefix}-${c}-${r}`;
+        const tex = this.textures.createCanvas(ck, cw, ch);
+        const ctx = tex.getContext();
+        ctx.clearRect(0, 0, cw, ch);
+        ctx.drawImage(srcImg, c * cw, r * ch, cw, ch, 0, 0, cw, ch);
+        tex.refresh();
+
         const cx = ox - dispW / 2 + (c + 0.5) * chunkW;
         const cy = oy - dispH + (r + 0.5) * chunkH;
-        const img = this.add.image(cx, cy, key);
+        const img = this.add.image(cx, cy, ck);
         img.setOrigin(0.5, 0.5).setScale(scaleX, scaleY).setDepth(depth + 1);
-        img.setCrop(c * cw, r * ch, cw, ch);
+
         const scatterAt = (r / rows) * 0.45 + Math.random() * 0.15;
         const dissolveAt = scatterAt + 0.2 + Math.random() * 0.2;
         const angle = Math.random() * Math.PI * 2;
         const dist = 10 + Math.random() * 18;
         chunks.push({
-          img, ox: cx, oy: cy,
+          img, texKey: ck, ox: cx, oy: cy,
           dx: Math.cos(angle) * dist, dy: Math.sin(angle) * dist - 12,
           scatterAt, dissolveAt,
         });
@@ -954,7 +962,10 @@ export default class BattleScene extends Phaser.Scene {
         }
       },
       onComplete: () => {
-        for (const ch of chunks) ch.img.destroy();
+        for (const ch of chunks) {
+          ch.img.destroy();
+          this.textures.remove(ch.texKey);
+        }
         if (onDone) onDone();
       },
     });
