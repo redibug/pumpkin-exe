@@ -402,7 +402,7 @@ export default class BattleScene extends Phaser.Scene {
     // cooldown (1s, does nothing) -> ready.
     const sprite = this.physics.add.sprite(0, 0, 'sentry');
     sprite.setData('fitMax', AUTOSCALE.sentry ?? FIT_MAX);
-    sprite.setOrigin(0.5, 1);
+    sprite.setOrigin(0.75, 1);
     this.placeFighter(sprite, col, row, SENTRY_MANUAL);
     // sensor light: red dot at the indicator on the sprite (74.5% from
     // left, 43.8% from top); flashes when activated
