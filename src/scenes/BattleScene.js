@@ -72,7 +72,6 @@ export default class BattleScene extends Phaser.Scene {
     this.loadout = [null, null, null, null]; // chip ids loaded into slots 1-4
     this.customTimer = 0;
     this.customOpen = false;
-    this._skipChips = 0; // frames to skip chip input after the custom screen closes
 
     // mandrake state machine
     this.mandrake = {
@@ -373,9 +372,12 @@ export default class BattleScene extends Phaser.Scene {
     this.input.off('pointerup', this._customArmHandler);
     if (this.customUI) { this.customUI.destroy(); this.customUI = null; }
     this.customOpen = false;
-    // Swallow the key edge that closed the screen: it's still JustDown on
-    // the next frame, which battle input would read as "use front chip".
-    this._skipChips = 1;
+    // Consume any pending JustDown edges: _justDown persists until read or
+    // key-up, so the key that closed the screen would otherwise fire a chip
+    // on a later frame (e.g. if still held).
+    const JD = Phaser.Input.Keyboard.JustDown;
+    JD(this.shootKey); JD(this.chipFrontKey); JD(this.chipFrontKey2); JD(this.enterKey);
+    Object.values(this.keys).forEach(JD);
     this.setPaused(false);
   }
 
@@ -737,10 +739,7 @@ export default class BattleScene extends Phaser.Scene {
       this.openCustom(true); // in scene update: no keydown dispatch in flight
     }
     this.handleMovement(time);
-    // skip one frame of chip input after the custom screen closes, so the
-    // key edge that confirmed it isn't re-read as "use front chip"
-    if (this._skipChips > 0) this._skipChips--;
-    else this.handleChips(time);
+    this.handleChips(time);
     this.bossAI(time);
     this.mandrakeAI(time);
     this.updateHud(time);
