@@ -18,7 +18,7 @@ const MANDRAKE_MANUAL = 0.25;
 
 // ---- custom screen / deck ----
 const CUSTOM_GAUGE_MS = 10000; // battle time to fill the custom gauge
-const HAND_MAX = 5;            // cards drawn per custom screen
+const HAND_MAX = 5;            // chip-case slots in the custom screen
 const LOADOUT_MAX = 4;         // selected cards -> the 1-4 chip slots
 
 // ---- glassy tile palette (base colors live in grid-config.json) ----
@@ -68,7 +68,7 @@ export default class BattleScene extends Phaser.Scene {
     // ---- custom screen / deck state ----
     this.deck = Phaser.Utils.Array.Shuffle([...DECK]);
     this.discardPile = [];
-    this.hand = [];
+    this.hand = Array(HAND_MAX).fill(null); // chip case: fixed slots, null = empty
     this.loadout = [null, null, null, null]; // chip ids loaded into slots 1-4
     this.customTimer = 0;
     this.customOpen = false;
@@ -213,12 +213,13 @@ export default class BattleScene extends Phaser.Scene {
   // ================= custom screen =================
 
   // MMBN-style custom: the gauge fills during battle, SHIFT opens this
-  // screen (also auto-opens when the battle starts). Draw up to HAND_MAX
-  // cards, pick up to LOADOUT_MAX for the 1-4 slots. Unpicked cards stay
-  // in hand for next time; X marks a card for discard (red X, tossed on
-  // confirm). Confirming spends the old loadout to the discard pile and
-  // loads the new picks. OK is an on-screen button, navigable with the
-  // arrows and clickable with the mouse (ESC still cancels).
+  // screen (also auto-opens when the battle starts). The hand is a chip
+  // case of HAND_MAX fixed slots: unpicked cards stay in their slots, and
+  // new chips load into the emptied slots. Pick up to LOADOUT_MAX for the
+  // 1-4 slots; X marks a card for discard (red X, tossed on confirm).
+  // Confirming spends the old loadout to the discard pile and loads the
+  // new picks. OK is an on-screen button, navigable with the arrows and
+  // clickable with the mouse (ESC still cancels).
   openCustom(skipKeyGuard = false) {
     if (this.customOpen || this.over || this.dialogue.isActive()) return;
     this.customOpen = true;
@@ -252,19 +253,21 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   drawToHand() {
-    while (this.hand.length < HAND_MAX) {
+    // chip case: new chips load into the empty slots; the rest stay put
+    for (let i = 0; i < HAND_MAX; i++) {
+      if (this.hand[i]) continue;
       if (this.deck.length === 0) {
         if (this.discardPile.length === 0) break;
         this.deck = Phaser.Utils.Array.Shuffle(this.discardPile);
         this.discardPile = [];
       }
-      this.hand.push(this.deck.pop());
+      this.hand[i] = this.deck.pop();
     }
   }
 
   handleCustomKey(event) {
     const cur = this.customCursor;
-    const rowLen = [this.hand.length, 1]; // cards row, OK button row
+    const rowLen = [HAND_MAX, 1]; // cards row, OK button row
     switch (event.code) {
       case 'ArrowLeft':
         cur.col = Math.max(0, cur.col - 1);
@@ -273,7 +276,7 @@ export default class BattleScene extends Phaser.Scene {
         cur.col = Math.min(rowLen[cur.row] - 1, cur.col + 1);
         break;
       case 'ArrowUp':
-        if (cur.row === 1) { cur.row = 0; cur.col = Math.min(cur.col, this.hand.length - 1); }
+        if (cur.row === 1) { cur.row = 0; cur.col = Math.min(cur.col, HAND_MAX - 1); }
         break;
       case 'ArrowDown':
         if (cur.row === 0) { cur.row = 1; cur.col = 0; }
@@ -306,7 +309,7 @@ export default class BattleScene extends Phaser.Scene {
 
   toggleCustomSelect() {
     const i = this.customCursor.col;
-    if (i < 0 || i >= this.hand.length) return;
+    if (i < 0 || i >= HAND_MAX || !this.hand[i]) return; // empty slot
     const at = this.customSelected.indexOf(i);
     if (at >= 0) {
       this.customSelected.splice(at, 1);
@@ -320,7 +323,7 @@ export default class BattleScene extends Phaser.Scene {
   // X: mark a card for discard (red X) — toggles; marking clears selection
   toggleCustomDiscard() {
     const i = this.customCursor.col;
-    if (i < 0 || i >= this.hand.length) return;
+    if (i < 0 || i >= HAND_MAX || !this.hand[i]) return; // empty slot
     const m = this.customDiscard.indexOf(i);
     if (m >= 0) {
       this.customDiscard.splice(m, 1);
@@ -343,9 +346,9 @@ export default class BattleScene extends Phaser.Scene {
     tossed.forEach((id) => this.discardPile.push(id));
     this.loadout = [null, null, null, null];
     picked.forEach((id, s) => { this.loadout[s] = id; });
-    // picked + tossed cards leave the hand
+    // picked + tossed cards leave their slots empty (chip case keeps position)
     const gone = new Set([...this.customSelected, ...this.customDiscard]);
-    [...gone].sort((a, b) => b - a).forEach((i) => this.hand.splice(i, 1));
+    gone.forEach((i) => { this.hand[i] = null; });
     this.updateLoadoutHud();
     this.closeCustomUI();
   }
@@ -420,15 +423,26 @@ export default class BattleScene extends Phaser.Scene {
 
   refreshCustomCards() {
     this.customCardLayer.removeAll(true);
-    const n = this.hand.length;
+    const n = HAND_MAX;
     const cw = 130, ch = 170, gap = 14;
     const x0 = 480 - (n * cw + (n - 1) * gap) / 2 + cw / 2;
     this.hand.forEach((chipId, i) => {
-      const chip = CHIP_MAP[chipId];
       const card = this.add.container(x0 + i * (cw + gap), 300);
+      const isCursor = this.customCursor.row === 0 && this.customCursor.col === i;
+      if (!chipId) {
+        // empty slot in the chip case: dim placeholder, not interactive
+        card.add(this.add.rectangle(0, 0, cw, ch, 0x0d1526, 0.35)
+          .setStrokeStyle(2, 0x1e293b));
+        if (isCursor) {
+          card.add(this.add.rectangle(0, 0, cw + 12, ch + 12, 0xffffff, 0.15)
+            .setStrokeStyle(2, 0xffffff));
+        }
+        this.customCardLayer.add(card);
+        return;
+      }
+      const chip = CHIP_MAP[chipId];
       const selIdx = this.customSelected.indexOf(i);
       const marked = this.customDiscard.includes(i);
-      const isCursor = this.customCursor.row === 0 && this.customCursor.col === i;
       const border = selIdx >= 0 ? 0x00e5ff : marked ? 0xff3b30 : isCursor ? 0xffffff : 0x334155;
       // hover halo: visible over any card state (selected/marked keep their border)
       if (isCursor) {
