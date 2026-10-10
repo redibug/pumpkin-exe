@@ -185,11 +185,13 @@ export default class BattleScene extends Phaser.Scene {
     this.load.image('chip-spread', 'assets/ui/chip-spread.png');
     this.load.image('chip-recover', 'assets/ui/chip-recover.png');
     this.load.image('chip-railgun', 'assets/ui/chip-railgun.png');
+    this.load.image('chip-rapid', 'assets/ui/chip-rapid.png');
     this.load.image('chip-cannon-small', 'assets/ui/chip-cannon-small.png');
     this.load.image('chip-sword-small', 'assets/ui/chip-sword-small.png');
     this.load.image('chip-spread-small', 'assets/ui/chip-spread-small.png');
     this.load.image('chip-recover-small', 'assets/ui/chip-recover-small.png');
     this.load.image('chip-railgun-small', 'assets/ui/chip-railgun-small.png');
+    this.load.image('chip-rapid-small', 'assets/ui/chip-rapid-small.png');
     this.load.image('chip-frame', 'assets/ui/chip-frame.png');
     this.load.image('mug-bugchan', 'assets/mugshots/mug-bugchan.png');
     this.load.image('mug-pumpkin', 'assets/mugshots/mug-pumpkin.png');
@@ -217,6 +219,9 @@ export default class BattleScene extends Phaser.Scene {
     this.discardPile = [];
     this.hand = Array(HAND_MAX).fill(null); // chip case: fixed slots, null = empty
     this.loadout = [null, null, null, null]; // chip ids loaded into slots 1-4
+    this.chipAmmo = [null, null, null, null]; // shots left for multi-use chips (rapid)
+    this.rapidFiring = null; // { slot, key } while holding a rapid chip
+    this.rapidNextShot = 0;
     this.customTimer = 0;
     this.customOpen = false;
 
@@ -657,6 +662,8 @@ export default class BattleScene extends Phaser.Scene {
     this.loadout.forEach((id) => { if (id) this.discardPile.push(id); });
     tossed.forEach((id) => this.discardPile.push(id));
     this.loadout = [null, null, null, null];
+    this.chipAmmo = [null, null, null, null];
+    this.rapidFiring = null;
     picked.forEach((id, s) => { this.loadout[s] = id; });
     // picked + tossed cards leave their slots empty (chip case keeps position)
     const gone = new Set([...this.customSelected, ...this.customDiscard]);
@@ -1180,7 +1187,12 @@ export default class BattleScene extends Phaser.Scene {
       const label = this.add.text(x, 530, `${i + 1}`, {
         fontFamily: 'monospace', fontSize: '14px', color: '#9fb3c8',
       }).setOrigin(0.5);
-      this.chipIcons.push({ frame, icon, label });
+      // ammo counter for multi-use chips (e.g. rapid fire): "×10" in yellow
+      const ammo = this.add.text(x + 16, 484, '', {
+        fontFamily: 'monospace', fontSize: '13px', color: '#ffeb3b',
+        fontStyle: 'bold',
+      }).setOrigin(0.5).setDepth(10);
+      this.chipIcons.push({ frame, icon, label, ammo });
     }
     this.updateLoadoutHud();
 
@@ -1194,7 +1206,7 @@ export default class BattleScene extends Phaser.Scene {
 
   // refresh the 4 slot icons from the current loadout
   updateLoadoutHud() {
-    this.chipIcons.forEach(({ frame, icon }, i) => {
+    this.chipIcons.forEach(({ frame, icon, ammo }, i) => {
       const id = this.loadout[i];
       const loaded = !!id;
       // only loaded chips get the chip frame; empty slots show the placeholder
@@ -1202,6 +1214,15 @@ export default class BattleScene extends Phaser.Scene {
       // NB: setTexture keeps the old scale, so re-apply the display size
       // every time (small chip art is 96x96, empty slot is 48x48).
       icon.setTexture(loaded ? `chip-${id}-small` : 'chip-empty').setDisplaySize(30, 30);
+      // ammo counter for multi-use chips (rapid fire)
+      const shots = this.chipAmmo[i];
+      if (loaded && shots != null && shots > 0) {
+        ammo.setText(`×${shots}`).setVisible(true);
+      } else {
+        ammo.setVisible(false);
+      }
+      // ammo text follows the icon when slots slide
+      ammo.x = icon.x + 16;
     });
   }
 
@@ -1264,11 +1285,94 @@ export default class BattleScene extends Phaser.Scene {
   handleChips(time) {
     // X: buster shoot (hitscan). Z/Space: use the front chip. 1-4: chips out of order.
     if (Phaser.Input.Keyboard.JustDown(this.shootKey)) this.fireShoot(time);
+    // Rapid fire: keep firing while the key is held (started via JustDown below)
+    if (this.rapidFiring) {
+      const { slot, key } = this.rapidFiring;
+      if (!key.isDown || this.loadout[slot] !== 'rapid') {
+        this.rapidFiring = null; // key released or chip gone
+      } else if (time >= this.rapidNextShot) {
+        this.fireRapidShot(slot, time);
+      }
+    }
     if (Phaser.Input.Keyboard.JustDown(this.chipFrontKey)
-      || Phaser.Input.Keyboard.JustDown(this.chipFrontKey2)) this.fireChipAt(0, time);
+      || Phaser.Input.Keyboard.JustDown(this.chipFrontKey2)) {
+      const k = Phaser.Input.Keyboard.JustDown(this.chipFrontKey) ? this.chipFrontKey : this.chipFrontKey2;
+      this.pressChipKey(0, k, time);
+    }
     const keyMap = [this.keys.ONE, this.keys.TWO, this.keys.THREE, this.keys.FOUR];
     keyMap.forEach((key, i) => {
-      if (Phaser.Input.Keyboard.JustDown(key)) this.fireChipAt(i, time);
+      if (Phaser.Input.Keyboard.JustDown(key)) this.pressChipKey(i, key, time);
+    });
+  }
+
+  // Called on JustDown of a chip key. Rapid fire starts a hold-to-fire;
+  // other chips fire once via fireChipAt.
+  pressChipKey(i, key, time) {
+    const chipId = this.loadout[i];
+    if (!chipId) return;
+    if (chipId === 'rapid') {
+      // don't restart if already firing this slot (e.g. pressing 1 while holding Z)
+      if (this.rapidFiring && this.rapidFiring.slot === i) return;
+      this.startRapidFire(i, key, time);
+    } else {
+      this.fireChipAt(i, time);
+    }
+  }
+
+  startRapidFire(slot, key, time) {
+    if (this.chipAmmo[slot] == null) {
+      this.chipAmmo[slot] = CHIP_MAP.rapid.shots; // 10
+    }
+    this.rapidFiring = { slot, key };
+    this.fireRapidShot(slot, time);
+  }
+
+  fireRapidShot(slot, time) {
+    const chip = CHIP_MAP.rapid;
+    // one weak, fast projectile down the navi's row
+    const row = this.naviPos.row;
+    const feet = tileFeet(this.naviPos.col, this.naviPos.row);
+    const proj = this.add.circle(feet.x + 30, tileCenter(0, row).y, 6, chip.color);
+    proj.setDepth(10 + row);
+    proj.setData('damage', chip.damage);
+    proj.setData('row', row);
+    proj.setData('vx', 750);
+    this.projectiles.add(proj);
+    // small muzzle flash
+    this.showMuzzleFlash(feet.x + 45 * this.navi.scaleX, feet.y - 115 * this.navi.scaleX, row);
+
+    this.chipAmmo[slot]--;
+    this.rapidNextShot = time + 130; // ~7.7 shots/sec
+
+    if (this.chipAmmo[slot] <= 0) {
+      // out of ammo: remove the chip, slide the rest left
+      this.rapidFiring = null;
+      this.removeChipFromLoadout(slot);
+    } else {
+      this.updateLoadoutHud();
+    }
+  }
+
+  // Remove chip at index i from the loadout (used up): splice, HUD, slide anim.
+  removeChipFromLoadout(i) {
+    this.loadout.splice(i, 1);
+    this.chipAmmo.splice(i, 1);
+    this.chipAmmo.push(null); // keep length 4
+    // fix rapidFiring slot if it was after the removed chip
+    if (this.rapidFiring && this.rapidFiring.slot > i) {
+      this.rapidFiring.slot--;
+    }
+    this.updateLoadoutHud();
+    this.chipIcons.forEach(({ frame, icon, ammo }, s) => {
+      this.tweens.killTweensOf([frame, icon, ammo]);
+      const targetX = 420 + s * 70;
+      if (s >= i && this.loadout[s]) {
+        frame.x = targetX + 70; icon.x = targetX + 70; ammo.x = targetX + 70 + 16;
+        this.tweens.add({ targets: [frame, icon], x: targetX, duration: 160, ease: 'Quad.easeOut' });
+        this.tweens.add({ targets: ammo, x: targetX + 16, duration: 160, ease: 'Quad.easeOut' });
+      } else {
+        frame.x = targetX; icon.x = targetX; ammo.x = targetX + 16;
+      }
     });
   }
 
@@ -1278,18 +1382,7 @@ export default class BattleScene extends Phaser.Scene {
     const chipId = this.loadout[i];
     if (!chipId) return;
     this.fireChip(CHIP_MAP[chipId], time);
-    this.loadout.splice(i, 1);
-    this.updateLoadoutHud();
-    this.chipIcons.forEach(({ frame, icon }, s) => {
-      this.tweens.killTweensOf([frame, icon]);
-      const targetX = 420 + s * 70;
-      if (s >= i && this.loadout[s]) {
-        frame.x = targetX + 70; icon.x = targetX + 70;
-        this.tweens.add({ targets: [frame, icon], x: targetX, duration: 160, ease: 'Quad.easeOut' });
-      } else {
-        frame.x = targetX; icon.x = targetX;
-      }
-    });
+    this.removeChipFromLoadout(i);
   }
 
   // Buster: instant hitscan down the navi's row — no projectile. Hits the
