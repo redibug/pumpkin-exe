@@ -1,5 +1,6 @@
-// Static deck — no deckbuilder. A fixed loadout of battle chips,
-// each with a cooldown so the player cycles through them MMBN-style.
+// Static deck — no deckbuilder. Battle chips are single-use: firing one
+// removes it from the loadout and the rest slide left to fill the hole.
+// (cooldownMs is legacy data, unused now that chips don't recharge.)
 
 export const CHIPS = [
   { id: 'cannon',  name: 'Cannon',  damage: 40, cooldownMs: 2500, color: 0xffa726, desc: 'Fires a straight shot down the row.' },

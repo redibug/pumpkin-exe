@@ -62,8 +62,8 @@ export default class BattleScene extends Phaser.Scene {
     this.naviPos = { col: 1, row: 1 };
     this.bossHp = BOSS.maxHp;
     this.bossPos = { col: 4, row: 1 };
-    this.chipCooldowns = {};
     this.projectiles = this.physics.add.group();
+    this.shootReadyAt = 0; // buster hitscan fire rate gate
 
     // ---- custom screen / deck state ----
     this.deck = Phaser.Utils.Array.Shuffle([...DECK]);
@@ -136,6 +136,9 @@ export default class BattleScene extends Phaser.Scene {
     this.cursors = this.input.keyboard.createCursorKeys();
     this.keys = this.input.keyboard.addKeys('ONE,TWO,THREE,FOUR');
     this.customKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+    this.shootKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X); // buster
+    this.chipFrontKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z); // front chip
+    this.chipFrontKey2 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE); // front chip
     this.input.mouse.disableContextMenu(); // right-click discards in the custom screen
 
     // ---- collisions ----
@@ -200,7 +203,7 @@ export default class BattleScene extends Phaser.Scene {
       }
       if (Number.isFinite(this.mandrake.timer)) this.mandrake.timer += pausedMs;
       if (Number.isFinite(this._lastMove)) this._lastMove += pausedMs;
-      for (const k of Object.keys(this.chipCooldowns)) this.chipCooldowns[k] += pausedMs;
+      if (Number.isFinite(this.shootReadyAt)) this.shootReadyAt += pausedMs;
       this.physics.world.resume();
       this.time.paused = false;
       (this._pausedAnims || []).forEach((a) => a.resume());
@@ -663,8 +666,11 @@ export default class BattleScene extends Phaser.Scene {
     }
     this.updateLoadoutHud();
 
-    this.add.text(700, 490, 'Arrows: move   1-4: chips   SHIFT: custom', {
-      fontFamily: 'monospace', fontSize: '14px', color: '#9fb3c8',
+    this.add.text(700, 482, 'Arrows: move · SHIFT: custom', {
+      fontFamily: 'monospace', fontSize: '12px', color: '#9fb3c8',
+    });
+    this.add.text(700, 502, 'X: shoot · Z/Space: chip · 1-4: chips', {
+      fontFamily: 'monospace', fontSize: '12px', color: '#9fb3c8',
     });
   }
 
@@ -733,23 +739,103 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   handleChips(time) {
+    // X: buster shoot (hitscan). Z/Space: use the front chip. 1-4: chips out of order.
+    if (Phaser.Input.Keyboard.JustDown(this.shootKey)) this.fireShoot(time);
+    if (Phaser.Input.Keyboard.JustDown(this.chipFrontKey)
+      || Phaser.Input.Keyboard.JustDown(this.chipFrontKey2)) this.fireChipAt(0, time);
     const keyMap = [this.keys.ONE, this.keys.TWO, this.keys.THREE, this.keys.FOUR];
     keyMap.forEach((key, i) => {
-      if (!Phaser.Input.Keyboard.JustDown(key)) return;
-      const chipId = this.loadout[i];
-      if (chipId) this.fireChip(CHIP_MAP[chipId], time);
+      if (Phaser.Input.Keyboard.JustDown(key)) this.fireChipAt(i, time);
     });
   }
 
-  chipReady(chip, time) {
-    const last = this.chipCooldowns[chip.id];
-    if (last === undefined) return true; // ready immediately at battle start
-    return time - last >= chip.cooldownMs;
+  // Use the chip at loadout index i (single use): it disappears and the
+  // chips to its right tween left to fill the hole.
+  fireChipAt(i, time) {
+    const chipId = this.loadout[i];
+    if (!chipId) return;
+    this.fireChip(CHIP_MAP[chipId], time);
+    this.loadout.splice(i, 1);
+    this.updateLoadoutHud();
+    this.chipIcons.forEach(({ icon }, s) => {
+      this.tweens.killTweensOf(icon);
+      const targetX = 420 + s * 70;
+      if (s >= i && this.loadout[s]) {
+        icon.x = targetX + 70;
+        this.tweens.add({ targets: icon, x: targetX, duration: 160, ease: 'Quad.easeOut' });
+      } else {
+        icon.x = targetX;
+      }
+    });
+  }
+
+  // Buster: instant hitscan down the navi's row — no projectile. Hits the
+  // first enemy ahead; shows the punch frame + a muzzle flash.
+  fireShoot(time) {
+    if (time < this.shootReadyAt) return;
+    this.shootReadyAt = time + 300;
+    this.showPunchFrame();
+    const s = this.navi.scaleX;
+    const mx = this.navi.x + 45 * s, my = this.navi.y - 115 * s;
+    this.showMuzzleFlash(mx, my);
+    const row = this.naviPos.row;
+    let target = null, targetCol = 99;
+    if (this.bossHp > 0 && this.bossPos.row === row
+      && this.bossPos.col > this.naviPos.col && this.bossPos.col < targetCol) {
+      target = 'boss'; targetCol = this.bossPos.col;
+    }
+    const md = this.mandrake;
+    if (md.alive && md.state === 'emerged' && md.pos.row === row
+      && md.pos.col > this.naviPos.col && md.pos.col < targetCol) {
+      target = 'mandrake'; targetCol = md.pos.col;
+    }
+    const endX = target ? tileCenter(targetCol, row).x : 930;
+    const beam = this.add.line(0, 0, mx, my, endX, my, 0xfff176).setLineWidth(3).setAlpha(0.9);
+    beam.setDepth(18);
+    this.tweens.add({ targets: beam, alpha: 0, duration: 110, onComplete: () => beam.destroy() });
+    if (target === 'boss') { this.damageBoss(10); this.flash(this.boss, 0xfff176); }
+    else if (target === 'mandrake') { this.damageMandrake(10); this.flash(this.mandrakeSprite, 0xfff176); }
+  }
+
+  // Punch frame for the buster. Mel is drawing the real punch frame +
+  // muzzle flash herself; until 'bugchan-punch' lands in sprites/, the
+  // fallback is a quick lunge. (Wire the preload in preload() when it lands.)
+  showPunchFrame() {
+    if (this._punchT) return;
+    const hasPunch = this.textures.exists('bugchan-punch');
+    if (hasPunch) {
+      this.navi.anims.pause();
+      this.navi.setTexture('bugchan-punch');
+    } else {
+      this.tweens.add({ targets: this.navi, x: this.navi.x + 8, duration: 60, yoyo: true });
+    }
+    this._punchT = this.time.delayedCall(130, () => {
+      this._punchT = null;
+      if (hasPunch) {
+        this.navi.setTexture('bugchan');
+        this.navi.play('bugchan-idle');
+      }
+    });
+  }
+
+  // PLACEHOLDER for Mel's muzzle-flash overlay: procedural star flash.
+  showMuzzleFlash(x, y) {
+    const g = this.add.graphics().setDepth(21);
+    const pts = [];
+    for (let k = 0; k < 16; k++) {
+      const r = k % 2 === 0 ? 26 : 10;
+      const a = (k / 16) * Math.PI * 2;
+      pts.push(new Phaser.Geom.Point(Math.cos(a) * r, Math.sin(a) * r));
+    }
+    g.fillStyle(0xfff176, 1);
+    g.fillPoints(pts, true);
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(0, 0, 8);
+    g.setPosition(x, y);
+    this.tweens.add({ targets: g, alpha: 0, scale: 1.6, duration: 90, onComplete: () => g.destroy() });
   }
 
   fireChip(chip, time) {
-    if (!this.chipReady(chip, time)) return;
-    this.chipCooldowns[chip.id] = time;
     const feet = tileFeet(this.naviPos.col, this.naviPos.row);
 
     if (chip.id === 'recover') {
@@ -937,8 +1023,7 @@ export default class BattleScene extends Phaser.Scene {
     const w = 216 * (this.naviHp / this.naviMaxHp);
     this.hpBar.setDisplaySize(Math.max(w, 0), 14);
     this.chipIcons.forEach(({ icon }, i) => {
-      const id = this.loadout[i];
-      icon.setAlpha(!id ? 0.25 : (this.chipReady(CHIP_MAP[id], time) ? 1 : 0.35));
+      icon.setAlpha(this.loadout[i] ? 1 : 0.25); // single-use: no recharge dimming
     });
   }
 
