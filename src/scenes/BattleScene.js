@@ -145,6 +145,11 @@ export default class BattleScene extends Phaser.Scene {
     this.load.image('chip-sword', 'assets/ui/chip-sword.png');
     this.load.image('chip-spread', 'assets/ui/chip-spread.png');
     this.load.image('chip-recover', 'assets/ui/chip-recover.png');
+    this.load.image('chip-cannon-small', 'assets/ui/chip-cannon-small.png');
+    this.load.image('chip-sword-small', 'assets/ui/chip-sword-small.png');
+    this.load.image('chip-spread-small', 'assets/ui/chip-spread-small.png');
+    this.load.image('chip-recover-small', 'assets/ui/chip-recover-small.png');
+    this.load.image('chip-frame', 'assets/ui/chip-frame.png');
     this.load.image('mug-bugchan', 'assets/mugshots/mug-bugchan.png');
     this.load.image('mug-pumpkin', 'assets/mugshots/mug-pumpkin.png');
     this.load.image('mug-mandrake', 'assets/mugshots/mug-mandrake.png');
@@ -435,20 +440,20 @@ export default class BattleScene extends Phaser.Scene {
 
   handleCustomKey(event) {
     const cur = this.customCursor;
-    const rowLen = [HAND_MAX, 1]; // cards row, OK button row
     switch (event.code) {
-      case 'ArrowLeft':
-        cur.col = Math.max(0, cur.col - 1);
-        break;
-      case 'ArrowRight':
-        cur.col = Math.min(rowLen[cur.row] - 1, cur.col + 1);
-        break;
       case 'ArrowUp':
-        if (cur.row === 1) { cur.row = 0; cur.col = Math.min(cur.col, HAND_MAX - 1); }
+        if (cur.row === 1) { cur.row = 0; cur.col = HAND_MAX - 1; }
+        else cur.col = Math.max(0, cur.col - 1);
         break;
       case 'ArrowDown':
-        if (cur.row === 0) { cur.row = 1; cur.col = 0; }
+        if (cur.row === 0) {
+          if (cur.col >= HAND_MAX - 1) { cur.row = 1; cur.col = 0; }
+          else cur.col = Math.min(HAND_MAX - 1, cur.col + 1);
+        }
         break;
+      case 'ArrowLeft':
+      case 'ArrowRight':
+        break; // single-column list: horizontal does nothing
       case 'KeyZ':
         this.activateCustomCursor();
         return;
@@ -529,7 +534,12 @@ export default class BattleScene extends Phaser.Scene {
     this.input.keyboard.off('keydown', this._customKeyHandler);
     this._customKeyHandler = null;
     this.input.off('pointerup', this._customArmHandler);
+    this.input.off('pointermove', this._customDragMove);
+    this.input.off('pointerup', this._customDragUp);
+    this._customDragMove = null; this._customDragUp = null;
     if (this.customUI) { this.customUI.destroy(); this.customUI = null; }
+    if (this.customBackdrop) { this.customBackdrop.destroy(); this.customBackdrop = null; }
+    this.customCards = null;
     this.customOpen = false;
     // Consume any pending JustDown edges: _justDown persists until read or
     // key-up, so the key that closed the screen would otherwise fire a chip
@@ -540,121 +550,165 @@ export default class BattleScene extends Phaser.Scene {
     this.setPaused(false);
   }
 
+  // ================= custom screen (redesigned) =================
+  // Left-side panel (draggable by the top handle) so the enemy layout stays
+  // visible while planning chips. Vertical chip list using the new chip
+  // frame; highlighting a chip shows its large art + name + desc.
+  // Selecting slides a chip right; marking for discard slides it left.
+
   buildCustomUI() {
-    const ui = this.add.container(0, 0).setDepth(200).setScrollFactor(0);
+    const PANEL_W = 400, PANEL_H = 508;
+    // subtle dim outside the panel (kept out of the draggable container)
+    this.customBackdrop = this.add.rectangle(480, 270, 960, 540, 0x05070f, 0.35)
+      .setDepth(199).setScrollFactor(0);
+    const ui = this.add.container(16, 16).setDepth(200).setScrollFactor(0);
     this.customUI = ui;
-    ui.add(this.add.rectangle(480, 270, 960, 540, 0x05070f, 0.88));
-    ui.add(this.add.rectangle(480, 270, 810, 430, 0x0a1226, 1).setStrokeStyle(3, 0x00e5ff));
-    ui.add(this.add.text(480, 92, 'CUSTOM SCREEN', {
-      fontFamily: 'monospace', fontSize: '28px', color: '#00e5ff',
-    }).setOrigin(0.5));
-    this.customCountsText = this.add.text(480, 132, '', {
-      fontFamily: 'monospace', fontSize: '14px', color: '#9fb3c8',
-    }).setOrigin(0.5);
-    ui.add(this.customCountsText);
-    this.customCardLayer = this.add.container(0, 0);
-    ui.add(this.customCardLayer);
-    this.customButtonLayer = this.add.container(0, 0);
-    ui.add(this.customButtonLayer);
-    ui.add(this.add.text(480, 472, 'arrows: move · Z/click: select · X/right-click: discard · ESC: cancel', {
-      fontFamily: 'monospace', fontSize: '14px', color: '#9fb3c8',
-    }).setOrigin(0.5));
-    this.refreshCustom();
-  }
 
-  refreshCustom() {
-    this.refreshCustomCards();
-    this.refreshCustomButtons();
-  }
+    ui.add(this.add.rectangle(PANEL_W / 2, PANEL_H / 2, PANEL_W, PANEL_H, 0x0a1226, 1)
+      .setStrokeStyle(3, 0x00e5ff));
 
-  refreshCustomButtons() {
-    this.customButtonLayer.removeAll(true);
-    const x = 480, y = 420;
-    const isCursor = this.customCursor.row === 1;
-    const bg = this.add.rectangle(x, y, 130, 44, 0x0d1526)
-      .setStrokeStyle(2, isCursor ? 0xffffff : 0x00e5ff);
-    bg.setInteractive({ useHandCursor: true });
-    bg.on('pointerover', () => {
-      this.customCursor = { row: 1, col: 0 };
-      this.refreshCustom();
-    });
-    bg.on('pointerdown', () => {
+    // top handle: drag the window around with the mouse
+    const handle = this.add.rectangle(PANEL_W / 2, 18, PANEL_W, 36, 0x0d1b33)
+      .setStrokeStyle(2, 0x00e5ff);
+    handle.setInteractive({ useHandCursor: true });
+    ui.add(handle);
+    ui.add(this.add.text(PANEL_W / 2, 18, 'CUSTOM SCREEN', {
+      fontFamily: 'monospace', fontSize: '20px', color: '#00e5ff',
+    }).setOrigin(0.5));
+    let dragging = false, dragDX = 0, dragDY = 0;
+    handle.on('pointerdown', (pointer) => {
       if (!this.customArmed) return; // ignore the click that opened the screen
-      this.confirmCustom();
+      dragging = true;
+      dragDX = pointer.x - ui.x;
+      dragDY = pointer.y - ui.y;
     });
-    const label = this.add.text(x, y, 'OK', {
-      fontFamily: 'monospace', fontSize: '18px',
-      color: isCursor ? '#ffffff' : '#e8f6ff',
-    }).setOrigin(0.5);
-    this.customButtonLayer.add([bg, label]);
-  }
+    this._customDragMove = (pointer) => {
+      if (!dragging || !pointer.isDown) return;
+      ui.x = Phaser.Math.Clamp(pointer.x - dragDX, -PANEL_W + 80, 960 - 80);
+      ui.y = Phaser.Math.Clamp(pointer.y - dragDY, 0, 540 - 80);
+    };
+    this._customDragUp = () => { dragging = false; };
+    this.input.on('pointermove', this._customDragMove);
+    this.input.on('pointerup', this._customDragUp);
 
-  refreshCustomCards() {
-    this.customCardLayer.removeAll(true);
-    const n = HAND_MAX;
-    const cw = 130, ch = 170, gap = 14;
-    const x0 = 480 - (n * cw + (n - 1) * gap) / 2 + cw / 2;
-    this.hand.forEach((chipId, i) => {
-      const card = this.add.container(x0 + i * (cw + gap), 300);
-      const isCursor = this.customCursor.row === 0 && this.customCursor.col === i;
-      if (!chipId) {
-        // empty slot in the chip case: dim placeholder, not interactive
-        card.add(this.add.rectangle(0, 0, cw, ch, 0x0d1526, 0.35)
-          .setStrokeStyle(2, 0x1e293b));
-        if (isCursor) {
-          card.add(this.add.rectangle(0, 0, cw + 12, ch + 12, 0xffffff, 0.15)
-            .setStrokeStyle(2, 0xffffff));
-        }
-        this.customCardLayer.add(card);
-        return;
-      }
-      const chip = CHIP_MAP[chipId];
-      const selIdx = this.customSelected.indexOf(i);
-      const marked = this.customDiscard.includes(i);
-      const border = selIdx >= 0 ? 0x00e5ff : marked ? 0xff3b30 : isCursor ? 0xffffff : 0x334155;
-      // hover halo: visible over any card state (selected/marked keep their border)
-      if (isCursor) {
-        card.add(this.add.rectangle(0, 0, cw + 12, ch + 12, 0xffffff, 0.15)
-          .setStrokeStyle(2, 0xffffff));
-      }
-      const bg = this.add.rectangle(0, 0, cw, ch, 0x0d1526)
-        .setStrokeStyle(selIdx >= 0 ? 4 : 2, border);
-      bg.setInteractive({ useHandCursor: true });
-      bg.on('pointerover', () => {
+    // persistent chip cards (built once so select/mark can slide-tween)
+    this.customCards = [];
+    for (let i = 0; i < HAND_MAX; i++) {
+      const baseX = 70, baseY = 95 + i * 75;
+      const root = this.add.container(baseX, baseY);
+      const halo = this.add.rectangle(0, 0, 68, 68, 0xffffff, 0.12)
+        .setStrokeStyle(2, 0xffffff).setVisible(false);
+      const frame = this.add.image(0, 0, 'chip-frame').setDisplaySize(56, 56);
+      const icon = this.add.image(0, -2, 'chip-empty').setDisplaySize(38, 38);
+      const selText = this.add.text(30, -30, '', {
+        fontFamily: 'monospace', fontSize: '16px', color: '#00e5ff',
+      }).setOrigin(0.5).setVisible(false);
+      // red X for marked (discard)
+      const m = 24;
+      const x1 = this.add.line(0, 0, -m, -m, m, m, 0xff3b30).setOrigin(0, 0).setLineWidth(6).setVisible(false);
+      const x2 = this.add.line(0, 0, m, -m, -m, m, 0xff3b30).setOrigin(0, 0).setLineWidth(6).setVisible(false);
+      const tint = this.add.rectangle(0, 0, 56, 56, 0xff3b30, 0.15).setVisible(false);
+      root.add([halo, frame, icon, tint, x1, x2, selText]);
+      frame.setInteractive({ useHandCursor: true });
+      frame.on('pointerover', () => {
         this.customCursor = { row: 0, col: i };
         this.refreshCustom();
       });
-      bg.on('pointerdown', (pointer) => {
-        if (!this.customArmed) return; // ignore the click that opened the screen
+      frame.on('pointerdown', (pointer) => {
+        if (!this.customArmed) return;
         this.customCursor = { row: 0, col: i };
         if (pointer.rightButtonDown()) this.toggleCustomDiscard();
         else this.toggleCustomSelect();
         this.refreshCustom();
       });
-      card.add(bg);
-      card.add(this.add.image(0, -40, `chip-${chipId}`).setDisplaySize(56, 56));
-      card.add(this.add.text(0, 12, chip.name, {
-        fontFamily: 'monospace', fontSize: '16px', color: '#e8f6ff',
-      }).setOrigin(0.5));
-      card.add(this.add.text(0, 36, chip.desc, {
-        fontFamily: 'monospace', fontSize: '10px', color: '#9fb3c8',
-        wordWrap: { width: cw - 18 },
-      }).setOrigin(0.5, 0));
-      if (selIdx >= 0) {
-        card.add(this.add.text(0, -ch / 2 - 16, `→ ${selIdx + 1}`, {
-          fontFamily: 'monospace', fontSize: '18px', color: '#00e5ff',
-        }).setOrigin(0.5));
-      }
-      if (marked) {
-        // red highlight + red X: tossed to the discard pile on confirm
-        // (Line geometry renders minus the display origin: setOrigin(0, 0))
-        card.add(this.add.rectangle(0, 0, cw, ch, 0xff3b30, 0.16));
-        const m = 36;
-        card.add(this.add.line(0, 0, -m, -m, m, m, 0xff3b30).setOrigin(0, 0).setLineWidth(7));
-        card.add(this.add.line(0, 0, m, -m, -m, m, 0xff3b30).setOrigin(0, 0).setLineWidth(7));
-      }
-      this.customCardLayer.add(card);
+      ui.add(root);
+      this.customCards.push({ root, halo, frame, icon, selText, x1, x2, tint, baseX });
+    }
+
+    // detail area: large art + name + desc of the highlighted chip
+    this.customDetailImage = this.add.image(255, 160, 'chip-empty').setDisplaySize(140, 140);
+    this.customDetailName = this.add.text(255, 248, '', {
+      fontFamily: 'monospace', fontSize: '20px', color: '#e8f6ff',
+    }).setOrigin(0.5);
+    this.customDetailDesc = this.add.text(255, 275, '', {
+      fontFamily: 'monospace', fontSize: '13px', color: '#9fb3c8',
+      wordWrap: { width: 200 }, align: 'center',
+    }).setOrigin(0.5, 0);
+    ui.add([this.customDetailImage, this.customDetailName, this.customDetailDesc]);
+
+    this.customCountsText = this.add.text(200, 425, '', {
+      fontFamily: 'monospace', fontSize: '13px', color: '#9fb3c8',
+    }).setOrigin(0.5);
+    ui.add(this.customCountsText);
+
+    // OK button
+    const okX = 200, okY = 462;
+    this.customOkBg = this.add.rectangle(okX, okY, 120, 40, 0x0d1526)
+      .setStrokeStyle(2, 0x00e5ff);
+    this.customOkBg.setInteractive({ useHandCursor: true });
+    this.customOkBg.on('pointerover', () => {
+      this.customCursor = { row: 1, col: 0 };
+      this.refreshCustom();
     });
+    this.customOkBg.on('pointerdown', () => {
+      if (!this.customArmed) return;
+      this.confirmCustom();
+    });
+    this.customOkLabel = this.add.text(okX, okY, 'OK', {
+      fontFamily: 'monospace', fontSize: '18px', color: '#e8f6ff',
+    }).setOrigin(0.5);
+    ui.add([this.customOkBg, this.customOkLabel]);
+
+    ui.add(this.add.text(200, 494, 'up/down: move · Z/click: select · X/right-click: discard', {
+      fontFamily: 'monospace', fontSize: '11px', color: '#9fb3c8',
+    }).setOrigin(0.5));
+
+    this.refreshCustom();
+  }
+
+  refreshCustom() {
+    if (!this.customUI) return;
+    // cards
+    this.hand.forEach((chipId, i) => {
+      const card = this.customCards[i];
+      const isCursor = this.customCursor.row === 0 && this.customCursor.col === i;
+      const selIdx = this.customSelected.indexOf(i);
+      const marked = this.customDiscard.includes(i);
+      const selected = selIdx >= 0;
+      if (!chipId) {
+        card.frame.setAlpha(0.3);
+        card.icon.setVisible(false);
+        card.halo.setVisible(isCursor);
+        card.selText.setVisible(false);
+        card.x1.setVisible(false); card.x2.setVisible(false); card.tint.setVisible(false);
+        this.tweens.killTweensOf(card.root);
+        card.root.x = card.baseX;
+      } else {
+        card.frame.setAlpha(1);
+        card.icon.setVisible(true).setTexture(`chip-${chipId}-small`);
+        card.halo.setVisible(isCursor);
+        card.selText.setVisible(selected).setText(selected ? `${selIdx + 1}` : '');
+        card.tint.setVisible(marked);
+        card.x1.setVisible(marked); card.x2.setVisible(marked);
+        // slide: selected -> right, marked -> left
+        const targetX = card.baseX + (selected ? 14 : 0) + (marked ? -14 : 0);
+        if (card.root.x !== targetX) {
+          this.tweens.killTweensOf(card.root);
+          this.tweens.add({ targets: card.root, x: targetX, duration: 150, ease: 'Quad.easeOut' });
+        }
+      }
+      // detail panel follows the highlighted chip
+      if (isCursor && chipId) {
+        const chip = CHIP_MAP[chipId];
+        this.customDetailImage.setTexture(`chip-${chipId}`).setVisible(true);
+        this.customDetailName.setText(chip.name);
+        this.customDetailDesc.setText(chip.desc);
+      }
+    });
+    // OK button highlight
+    const okCursor = this.customCursor.row === 1;
+    this.customOkBg.setStrokeStyle(2, okCursor ? 0xffffff : 0x00e5ff);
+    this.customOkLabel.setColor(okCursor ? '#ffffff' : '#e8f6ff');
     this.customCountsText.setText(
       `deck: ${this.deck.length}   discard: ${this.discardPile.length}` +
       `   selected: ${this.customSelected.length}/${LOADOUT_MAX}   marked: ${this.customDiscard.length}`,
@@ -857,15 +911,17 @@ export default class BattleScene extends Phaser.Scene {
     g.generateTexture('chip-empty', 48, 48);
     g.destroy();
 
-    // 4 loadout slots (1-4): filled from the custom screen
+    // 4 loadout slots (1-4): filled from the custom screen.
+    // New chip frame with the small chip art as its label.
     this.chipIcons = [];
     for (let i = 0; i < LOADOUT_MAX; i++) {
       const x = 420 + i * 70;
-      const icon = this.add.image(x, 500, 'chip-empty').setDisplaySize(32, 32);
+      const frame = this.add.image(x, 500, 'chip-frame').setDisplaySize(44, 44);
+      const icon = this.add.image(x, 498, 'chip-empty').setDisplaySize(30, 30);
       const label = this.add.text(x, 530, `${i + 1}`, {
         fontFamily: 'monospace', fontSize: '14px', color: '#9fb3c8',
       }).setOrigin(0.5);
-      this.chipIcons.push({ icon, label });
+      this.chipIcons.push({ frame, icon, label });
     }
     this.updateLoadoutHud();
 
@@ -882,8 +938,8 @@ export default class BattleScene extends Phaser.Scene {
     this.chipIcons.forEach(({ icon }, i) => {
       const id = this.loadout[i];
       // NB: setTexture keeps the old scale, so re-apply the display size
-      // every time (chip art is 800x800, empty slot is 48x48).
-      icon.setTexture(id ? `chip-${id}` : 'chip-empty').setDisplaySize(32, 32);
+      // every time (small chip art is 96x96, empty slot is 48x48).
+      icon.setTexture(id ? `chip-${id}-small` : 'chip-empty').setDisplaySize(30, 30);
     });
   }
 
@@ -962,14 +1018,14 @@ export default class BattleScene extends Phaser.Scene {
     this.fireChip(CHIP_MAP[chipId], time);
     this.loadout.splice(i, 1);
     this.updateLoadoutHud();
-    this.chipIcons.forEach(({ icon }, s) => {
-      this.tweens.killTweensOf(icon);
+    this.chipIcons.forEach(({ frame, icon }, s) => {
+      this.tweens.killTweensOf([frame, icon]);
       const targetX = 420 + s * 70;
       if (s >= i && this.loadout[s]) {
-        icon.x = targetX + 70;
-        this.tweens.add({ targets: icon, x: targetX, duration: 160, ease: 'Quad.easeOut' });
+        frame.x = targetX + 70; icon.x = targetX + 70;
+        this.tweens.add({ targets: [frame, icon], x: targetX, duration: 160, ease: 'Quad.easeOut' });
       } else {
-        icon.x = targetX;
+        frame.x = targetX; icon.x = targetX;
       }
     });
   }
