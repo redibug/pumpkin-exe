@@ -890,24 +890,22 @@ export default class BattleScene extends Phaser.Scene {
     });
   }
 
-  // Dissolve a sprite into square pixel chunks when it's deleted. The chunk
-  // size adapts to the sprite's on-screen dimensions (target ~8px per chunk).
-  // Animation: chunks start at their original positions (intact sprite), then
-  // lerp outward to scattered positions top-to-bottom, then get deleted
-  // top-to-bottom with a flicker.
+  // Dissolve a sprite into pixel chunks when it's deleted. Chunks start at
+  // their original positions (intact sprite), lerp outward top-to-bottom,
+  // then delete top-to-bottom with a flicker. Uses top-left origin with
+  // simple offset math for guaranteed alignment.
   dissolveSprite(sprite, onDone) {
     const DURATION = 700;
-    const TARGET_PX = 8; // target on-screen chunk size
+    const TARGET_PX = 10;
 
     const frame = sprite.frame;
     const fw = frame.width, fh = frame.height;
     const scaleX = sprite.scaleX, scaleY = sprite.scaleY;
-    const cols = Phaser.Math.Clamp(Math.round((fw * scaleX) / TARGET_PX), 4, 40);
-    const rows = Phaser.Math.Clamp(Math.round((fh * scaleY) / TARGET_PX), 4, 40);
+    const cols = Phaser.Math.Clamp(Math.round((fw * scaleX) / TARGET_PX), 3, 30);
+    const rows = Phaser.Math.Clamp(Math.round((fh * scaleY) / TARGET_PX), 3, 30);
     const cw = fw / cols, ch = fh / rows;
     const ox = sprite.x, oy = sprite.y;
     const key = sprite.texture.key;
-    const frameName = frame.name;
     const depth = sprite.depth;
 
     sprite.setVisible(false);
@@ -915,21 +913,23 @@ export default class BattleScene extends Phaser.Scene {
     const chunks = [];
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
-        // chunk center in sprite-local coords (origin 0.5,1 => bottom-center at 0,0)
-        const lx = (c * cw + cw / 2 - fw / 2) * scaleX;
-        const ly = (r * ch + ch / 2 - fh) * scaleY;
-        const img = this.add.image(ox + lx, oy + ly, key, frameName);
-        img.setOrigin(0.5, 0.5).setScale(scaleX, scaleY).setDepth(depth + 1);
+        const img = this.add.image(0, 0, key);
+        // top-left origin: chunk's top-left in sprite-local coords
+        // (sprite origin 0.5,1 => local (0,0) is bottom-center at (ox,oy))
+        const localX = c * cw - fw / 2;
+        const localY = r * ch - fh;
+        img.setOrigin(0, 0);
+        img.setPosition(ox + localX * scaleX, oy + localY * scaleY);
+        img.setScale(scaleX, scaleY);
+        img.setDepth(depth + 1);
         img.setCrop(c * cw, r * ch, cw, ch);
-        // scatter outward (biased up), top rows first
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 10 + Math.random() * 18;
         const scatterAt = (r / rows) * 0.45 + Math.random() * 0.15;
         const dissolveAt = scatterAt + 0.2 + Math.random() * 0.2;
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 10 + Math.random() * 18;
         chunks.push({
           img, ox: img.x, oy: img.y,
-          dx: Math.cos(angle) * dist,
-          dy: Math.sin(angle) * dist - 12, // bias upward
+          dx: Math.cos(angle) * dist, dy: Math.sin(angle) * dist - 12,
           scatterAt, dissolveAt,
         });
       }
@@ -937,26 +937,18 @@ export default class BattleScene extends Phaser.Scene {
 
     const progress = { t: 0 };
     this.tweens.add({
-      targets: progress,
-      t: 1,
-      duration: DURATION,
-      ease: 'Quad.easeIn',
+      targets: progress, t: 1, duration: DURATION, ease: 'Quad.easeIn',
       onUpdate: () => {
         for (const ch of chunks) {
           if (progress.t < ch.scatterAt) {
-            // intact
             ch.img.setPosition(ch.ox, ch.oy);
-            ch.img.setAlpha(1);
-            ch.img.setVisible(true);
+            ch.img.setAlpha(1).setVisible(true);
           } else if (progress.t < ch.dissolveAt) {
-            // scattering: lerp to offset
             const k = (progress.t - ch.scatterAt) / (ch.dissolveAt - ch.scatterAt);
-            const e = k * k; // accelerate outward
+            const e = k * k;
             ch.img.setPosition(ch.ox + ch.dx * e, ch.oy + ch.dy * e);
-            ch.img.setAlpha(1 - e * 0.4);
-            ch.img.setVisible(true);
+            ch.img.setAlpha(1 - e * 0.4).setVisible(true);
           } else {
-            // deleting: brief flicker then gone
             const d = progress.t - ch.dissolveAt;
             ch.img.setVisible(d < 0.06 && Math.random() > 0.5);
           }
