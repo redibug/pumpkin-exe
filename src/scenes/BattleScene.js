@@ -552,8 +552,9 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   // Translucent perspective highlight over a tile (telegraphs, sword arc).
+  // Floor-level: always below the characters.
   highlightTile(c, r, color, alpha = 0.4) {
-    const g = this.add.graphics().setDepth(30);
+    const g = this.add.graphics().setDepth(5);
     const [tl, tr, br, bl] = tileCorners(c, r);
     g.fillStyle(color, alpha);
     g.fillPoints([tl, tr, br, bl], true);
@@ -825,7 +826,7 @@ export default class BattleScene extends Phaser.Scene {
         }
         const bc = tileCenter(target.col, target.row);
         const boom = this.add.circle(bc.x, bc.y, 40, 0xff9e2c, 0.5);
-        boom.setDepth(25);
+        boom.setDepth(10 + target.row); // above the floor, ordered by row
         this.tweens.add({ targets: boom, alpha: 0, scale: 1.6, duration: 250,
           onComplete: () => boom.destroy() });
       });
@@ -868,12 +869,12 @@ export default class BattleScene extends Phaser.Scene {
       const left = project(0, md.pos.row + 0.5);
       const right = project(6, md.pos.row + 0.5);
       const wave = this.add.rectangle((left.x + right.x) / 2, rowC.y, right.x - left.x, 40, 0xba68c8, 0.35);
-      wave.setDepth(25);
+      wave.setDepth(10 + md.pos.row); // above the floor, ordered by row
       this.tweens.add({ targets: wave, alpha: 0, x: left.x - 40, duration: 350,
         onComplete: () => wave.destroy() });
       this.add.text(rowC.x, rowC.y - 70, 'KYAAAH!!', {
         fontFamily: 'monospace', fontSize: '22px', color: '#ba68c8',
-      }).setOrigin(0.5).setName('screamText');
+      }).setOrigin(0.5).setDepth(10 + md.pos.row).setName('screamText');
       this.time.delayedCall(600, () => {
         const t = this.children.getByName('screamText');
         if (t) t.destroy();
@@ -959,10 +960,10 @@ export default class BattleScene extends Phaser.Scene {
     this.over = true;
     this.add.text(480, 250, 'GAME OVER', {
       fontFamily: 'monospace', fontSize: '56px', color: '#ff5252',
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setDepth(100);
     this.add.text(480, 320, 'press R to jack in again', {
       fontFamily: 'monospace', fontSize: '18px', color: '#9fb3c8',
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setDepth(100);
     this.input.keyboard.once('keydown-R', () => this.scene.restart());
   }
 
@@ -970,12 +971,12 @@ export default class BattleScene extends Phaser.Scene {
     this.over = true;
     this.add.text(480, 250, 'VIRUS DELETED', {
       fontFamily: 'monospace', fontSize: '56px', color: '#81c784',
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setDepth(100);
     this.add.text(480, 320, 'PUMPKIN.EXE + RUTABAGA.MND busted!', {
       fontFamily: 'monospace', fontSize: '18px', color: '#9fb3c8',
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setDepth(100);
     this.add.text(480, 360, 'thanks for playing! 🎃🥕', {
       fontFamily: 'monospace', fontSize: '18px', color: '#9fb3c8',
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setDepth(100);
   }
 }
