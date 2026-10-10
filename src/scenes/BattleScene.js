@@ -420,6 +420,7 @@ export default class BattleScene extends Phaser.Scene {
       state: 'ready', // ready | activated | cooldown
       cooldownUntil: 0,
       hpBar: this.makeHpBar(),
+      baseX: sprite.x, baseY: sprite.y, // home position (for kickback reset)
     };
     this.enemies.push(enemy);
     return enemy;
@@ -1722,6 +1723,8 @@ export default class BattleScene extends Phaser.Scene {
       if (e.sensor) { this.tweens.killTweensOf(e.sensor); e.sensor.setVisible(false); }
       this.tweens.killTweensOf(e.sprite); // stop idle/shoot tweens
       if (e.bobTween) e.bobTween.stop(); // stop the infinite idle bob
+      // reset to home position (e.g. sentry kickback) so dissolve aligns
+      if (e.baseX !== undefined) e.sprite.setPosition(e.baseX, e.baseY);
       // dissolve top-to-bottom (replaces the old grow+fade)
       this.dissolveSprite(e.sprite);
       this.updateHpBar(e); // hides the bar
