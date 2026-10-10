@@ -409,7 +409,8 @@ export default class BattleScene extends Phaser.Scene {
     this.updateCustomGaugeHud();
     this.setPaused(true);
     this.drawToHand();
-    this.customCursor = { row: 0, col: 0 }; // row 0 = cards, row 1 = buttons
+    this.customCursor = { row: 0, col: 0 }; // row 0 = cards, row 1 = OK button
+    this.customOkFromCol = HAND_MAX - 1; // Left/Up from OK returns here
     this.customSelected = []; // hand indices, in selection order
     this.customDiscard = []; // hand indices marked for discard (red X)
     this.buildCustomUI();
@@ -451,18 +452,28 @@ export default class BattleScene extends Phaser.Scene {
     const cur = this.customCursor;
     switch (event.code) {
       case 'ArrowUp':
-        if (cur.row === 1) { cur.row = 0; cur.col = HAND_MAX - 1; }
+        if (cur.row === 1) { cur.row = 0; cur.col = this.customOkFromCol; }
         else cur.col = Math.max(0, cur.col - 1);
         break;
       case 'ArrowDown':
         if (cur.row === 0) {
-          if (cur.col >= HAND_MAX - 1) { cur.row = 1; cur.col = 0; }
-          else cur.col = Math.min(HAND_MAX - 1, cur.col + 1);
+          if (cur.col >= HAND_MAX - 1) {
+            this.customOkFromCol = cur.col;
+            cur.row = 1; cur.col = 0;
+          } else cur.col = Math.min(HAND_MAX - 1, cur.col + 1);
+        }
+        break;
+      case 'ArrowRight':
+        // OK button sits in the right column: Right reaches it from the chips
+        if (cur.row === 0) {
+          this.customOkFromCol = cur.col;
+          cur.row = 1; cur.col = 0;
         }
         break;
       case 'ArrowLeft':
-      case 'ArrowRight':
-        break; // single-column list: horizontal does nothing
+        // Left from OK returns to the chip we came from
+        if (cur.row === 1) { cur.row = 0; cur.col = this.customOkFromCol; }
+        break;
       case 'KeyZ':
         this.activateCustomCursor();
         return;
