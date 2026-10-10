@@ -237,8 +237,8 @@ export default class BattleScene extends Phaser.Scene {
     this.debugGameplay = createDebugGameplay({
       onSkipBattle: () => this.debugSkipBattle(),
     });
-    this.debugGameplay.setVisible(false);
-    this.debugGameplayVisible = false;
+    this.debugGameplay.setVisible(true);
+    this.debugGameplayVisible = true;
     document.getElementById('game').appendChild(this.debugGameplay.el);
     this.input.keyboard.on('keydown-G', () => {
       this.debugGameplayVisible = !this.debugGameplayVisible;
