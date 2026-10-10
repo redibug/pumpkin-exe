@@ -891,6 +891,8 @@ export default class BattleScene extends Phaser.Scene {
     }
     sprite.setData('teleporting', true);
     this.playTeleportFrames(sprite, 'out', () => {
+      // abort if the sprite died mid-teleport
+      if (!sprite.getData('teleporting')) return;
       this.placeFighter(sprite, col, row, manual);
       this.playTeleportFrames(sprite, 'in', () => {
         sprite.setData('teleporting', false);
@@ -1025,6 +1027,11 @@ export default class BattleScene extends Phaser.Scene {
 
     let step = 0;
     const tick = () => {
+      // abort if the sprite died mid-teleport (damageEnemy clears the flag)
+      if (!sprite.getData('teleporting')) {
+        objs.forEach((o) => { if (o.active) o.destroy(); });
+        return;
+      }
       if (step < order.length) {
         const st = frames[order[step]];
         for (let i = 0; i < STRIPS; i++) {
@@ -1039,6 +1046,8 @@ export default class BattleScene extends Phaser.Scene {
         onDone();
       }
     };
+    // store strips so damageEnemy can clean them up if the sprite dies
+    sprite.setData('teleportObjs', objs);
     tick();
   }
 
@@ -1723,6 +1732,14 @@ export default class BattleScene extends Phaser.Scene {
       if (e.sensor) { this.tweens.killTweensOf(e.sensor); e.sensor.setVisible(false); }
       this.tweens.killTweensOf(e.sprite); // stop idle/shoot tweens
       if (e.bobTween) e.bobTween.stop(); // stop the infinite idle bob
+      // abort mid-teleport: clear the flag (tick sees it and cleans up),
+      // destroy any strip objects
+      if (e.sprite.getData('teleporting')) {
+        e.sprite.setData('teleporting', false);
+        const objs = e.sprite.getData('teleportObjs') || [];
+        objs.forEach((o) => { if (o.active) o.destroy(); });
+        e.sprite.setData('teleportObjs', null);
+      }
       // reset to home position (e.g. sentry kickback) so dissolve aligns
       if (e.baseX !== undefined) e.sprite.setPosition(e.baseX, e.baseY);
       // dissolve top-to-bottom (replaces the old grow+fade)
