@@ -8,6 +8,18 @@ export const CHIPS = [
   { id: 'recover', name: 'Recover', damage: 0,  cooldownMs: 9000, color: 0x81c784, desc: 'Restores 60 HP to the navi.' },
 ];
 
+export const CHIP_MAP = Object.fromEntries(CHIPS.map((c) => [c.id, c]));
+
+// Hardcoded battle deck — the chips that exist, no deckbuilding.
+// Drawn into the hand at the custom screen; unselected cards stay in
+// hand until discarded, spent/selected cards go to the discard pile.
+export const DECK = [
+  'cannon', 'cannon', 'cannon', 'cannon', 'cannon', 'cannon',
+  'sword', 'sword', 'sword', 'sword', 'sword',
+  'spread', 'spread', 'spread', 'spread', 'spread',
+  'recover', 'recover', 'recover', 'recover',
+];
+
 // Boss data — PUMPKIN.EXE. Phases keyed by HP thresholds.
 export const BOSS = {
   name: 'PUMPKIN.EXE',

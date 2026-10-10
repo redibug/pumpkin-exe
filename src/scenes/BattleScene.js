@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { COLS, ROWS, project, tileCorners, tileFeet, tileCenter, isPlayerTile, gridParams, setGridParams, getGridParams, hexToRgb } from '../systems/grid.js';
-import { CHIPS, BOSS } from '../systems/chips.js';
+import { CHIP_MAP, DECK, BOSS } from '../systems/chips.js';
 import { RUTABAGA_MANDRAKE } from '../systems/viruses.js';
 import { fitFactor } from '../systems/spriteFit.js';
 import { createDebugOverlay } from '../systems/debugOverlay.js';
@@ -15,6 +15,11 @@ const M = RUTABAGA_MANDRAKE;
 const NAVI_MANUAL = 1;
 const BOSS_MANUAL = 0.5;
 const MANDRAKE_MANUAL = 0.25;
+
+// ---- custom screen / deck ----
+const CUSTOM_GAUGE_MS = 10000; // battle time to fill the custom gauge
+const HAND_MAX = 5;            // cards drawn per custom screen
+const LOADOUT_MAX = 4;         // selected cards -> the 1-4 chip slots
 
 // ---- glassy tile palette (base colors live in grid-config.json) ----
 const WHITE = { r: 255, g: 255, b: 255 };
@@ -59,6 +64,14 @@ export default class BattleScene extends Phaser.Scene {
     this.bossPos = { col: 4, row: 1 };
     this.chipCooldowns = {};
     this.projectiles = this.physics.add.group();
+
+    // ---- custom screen / deck state ----
+    this.deck = Phaser.Utils.Array.Shuffle([...DECK]);
+    this.discardPile = [];
+    this.hand = [];
+    this.loadout = [null, null, null, null]; // chip ids loaded into slots 1-4
+    this.customTimer = 0;
+    this.customOpen = false;
 
     // mandrake state machine
     this.mandrake = {
@@ -122,6 +135,7 @@ export default class BattleScene extends Phaser.Scene {
     // ---- input ----
     this.cursors = this.input.keyboard.createCursorKeys();
     this.keys = this.input.keyboard.addKeys('ONE,TWO,THREE,FOUR');
+    this.customKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
 
     // ---- collisions ----
     this.physics.add.overlap(this.projectiles, this.boss, (boss, proj) => {
@@ -142,11 +156,12 @@ export default class BattleScene extends Phaser.Scene {
       fontFamily: 'monospace', fontSize: '20px', color: '#ffb74d',
     }).setOrigin(0.5).setName('bossHpText');
 
-    // battle intro; the fight starts when it finishes
+    // battle intro; the custom screen opens first, then the fight starts
     this.startDialogue(SCRIPTS.intro, () => {
       this.nextBossMove = this.time.now + 1400;
       this.nextBossAttack = this.time.now + 2200;
       this.mandrake.timer = this.time.now + M.burrowedMs;
+      this.openCustom(); // MMBN-style: every battle starts at the custom screen
     });
   }
 
@@ -200,6 +215,163 @@ export default class BattleScene extends Phaser.Scene {
       this.setPaused(false);
       if (onDone) onDone();
     });
+  }
+
+  // ================= custom screen =================
+
+  // MMBN-style custom: the gauge fills during battle, SHIFT opens this
+  // screen (also auto-opens when the battle starts). Draw up to HAND_MAX
+  // cards, pick up to LOADOUT_MAX for the 1-4 slots. Unpicked cards stay
+  // in hand for next time; C discards the hovered card. Confirming spends
+  // the old loadout to the discard pile and loads the new picks.
+  openCustom() {
+    if (this.customOpen || this.over || this.dialogue.isActive()) return;
+    this.customOpen = true;
+    this.customTimer = 0;
+    this.updateCustomGaugeHud();
+    this.setPaused(true);
+    this.drawToHand();
+    this.customCursor = 0;
+    this.customSelected = []; // hand indices, in selection order
+    this.buildCustomUI();
+    this._customKeyHandler = (event) => this.handleCustomKey(event);
+    this.input.keyboard.on('keydown', this._customKeyHandler);
+  }
+
+  drawToHand() {
+    while (this.hand.length < HAND_MAX) {
+      if (this.deck.length === 0) {
+        if (this.discardPile.length === 0) break;
+        this.deck = Phaser.Utils.Array.Shuffle(this.discardPile);
+        this.discardPile = [];
+      }
+      this.hand.push(this.deck.pop());
+    }
+  }
+
+  handleCustomKey(event) {
+    switch (event.code) {
+      case 'ArrowLeft':
+        this.customCursor = Math.max(0, this.customCursor - 1);
+        break;
+      case 'ArrowRight':
+        this.customCursor = Math.min(this.hand.length - 1, this.customCursor + 1);
+        break;
+      case 'KeyZ':
+        this.toggleCustomSelect();
+        break;
+      case 'KeyX':
+      case 'Enter':
+        this.confirmCustom();
+        return;
+      case 'KeyC':
+        this.discardCustomCard();
+        break;
+      case 'Escape':
+        this.cancelCustom();
+        return;
+      default:
+        return;
+    }
+    this.refreshCustomCards();
+  }
+
+  toggleCustomSelect() {
+    const i = this.customCursor;
+    if (i < 0 || i >= this.hand.length) return;
+    const at = this.customSelected.indexOf(i);
+    if (at >= 0) this.customSelected.splice(at, 1);
+    else if (this.customSelected.length < LOADOUT_MAX) this.customSelected.push(i);
+  }
+
+  discardCustomCard() {
+    const i = this.customCursor;
+    if (i < 0 || i >= this.hand.length) return;
+    const at = this.customSelected.indexOf(i);
+    if (at >= 0) this.customSelected.splice(at, 1);
+    this.customSelected = this.customSelected.map((s) => (s > i ? s - 1 : s));
+    this.discardPile.push(this.hand[i]);
+    this.hand.splice(i, 1);
+    this.customCursor = Math.min(this.customCursor, this.hand.length - 1);
+  }
+
+  confirmCustom() {
+    if (this.customSelected.length === 0) { this.closeCustomUI(); return; } // nothing picked: keep loadout
+    const picked = this.customSelected.map((i) => this.hand[i]); // selection order
+    // old loadout is spent
+    this.loadout.forEach((id) => { if (id) this.discardPile.push(id); });
+    this.loadout = [null, null, null, null];
+    picked.forEach((id, s) => { this.loadout[s] = id; });
+    // picked cards leave the hand
+    [...this.customSelected].sort((a, b) => b - a).forEach((i) => this.hand.splice(i, 1));
+    this.updateLoadoutHud();
+    this.closeCustomUI();
+  }
+
+  cancelCustom() {
+    this.closeCustomUI(); // gauge stays spent, loadout unchanged
+  }
+
+  closeCustomUI() {
+    this.input.keyboard.off('keydown', this._customKeyHandler);
+    this._customKeyHandler = null;
+    if (this.customUI) { this.customUI.destroy(); this.customUI = null; }
+    this.customOpen = false;
+    this.setPaused(false);
+  }
+
+  buildCustomUI() {
+    const ui = this.add.container(0, 0).setDepth(200).setScrollFactor(0);
+    this.customUI = ui;
+    ui.add(this.add.rectangle(480, 270, 960, 540, 0x05070f, 0.88));
+    ui.add(this.add.rectangle(480, 270, 810, 430, 0x0a1226, 1).setStrokeStyle(3, 0x00e5ff));
+    ui.add(this.add.text(480, 92, 'CUSTOM SCREEN', {
+      fontFamily: 'monospace', fontSize: '28px', color: '#00e5ff',
+    }).setOrigin(0.5));
+    this.customCountsText = this.add.text(480, 132, '', {
+      fontFamily: 'monospace', fontSize: '14px', color: '#9fb3c8',
+    }).setOrigin(0.5);
+    ui.add(this.customCountsText);
+    this.customCardLayer = this.add.container(0, 0);
+    ui.add(this.customCardLayer);
+    ui.add(this.add.text(480, 472, '←/→ move · Z select · X confirm · C discard · ESC cancel', {
+      fontFamily: 'monospace', fontSize: '14px', color: '#9fb3c8',
+    }).setOrigin(0.5));
+    this.refreshCustomCards();
+  }
+
+  refreshCustomCards() {
+    this.customCardLayer.removeAll(true);
+    const n = this.hand.length;
+    const cw = 130, ch = 170, gap = 14;
+    const x0 = 480 - (n * cw + (n - 1) * gap) / 2 + cw / 2;
+    this.hand.forEach((chipId, i) => {
+      const chip = CHIP_MAP[chipId];
+      const card = this.add.container(x0 + i * (cw + gap), 300);
+      const selIdx = this.customSelected.indexOf(i);
+      const isCursor = i === this.customCursor;
+      card.add(this.add.rectangle(0, 0, cw, ch, 0x0d1526).setStrokeStyle(
+        selIdx >= 0 ? 4 : 2,
+        selIdx >= 0 ? 0x00e5ff : (isCursor ? 0xffffff : 0x334155),
+      ));
+      card.add(this.add.image(0, -40, `chip-${chipId}`).setDisplaySize(56, 56));
+      card.add(this.add.text(0, 12, chip.name, {
+        fontFamily: 'monospace', fontSize: '16px', color: '#e8f6ff',
+      }).setOrigin(0.5));
+      card.add(this.add.text(0, 36, chip.desc, {
+        fontFamily: 'monospace', fontSize: '10px', color: '#9fb3c8',
+        wordWrap: { width: cw - 18 },
+      }).setOrigin(0.5, 0));
+      if (selIdx >= 0) {
+        card.add(this.add.text(0, -ch / 2 - 16, `→ ${selIdx + 1}`, {
+          fontFamily: 'monospace', fontSize: '18px', color: '#00e5ff',
+        }).setOrigin(0.5));
+      }
+      this.customCardLayer.add(card);
+    });
+    this.customCountsText.setText(
+      `deck: ${this.deck.length}   discard: ${this.discardPile.length}   selected: ${this.customSelected.length}/${LOADOUT_MAX}`,
+    );
   }
 
   // ================= teleport =================
@@ -374,19 +546,53 @@ export default class BattleScene extends Phaser.Scene {
     this.hpBar = this.add.rectangle(122, 500, 216, 14, 0x4fc3f7).setOrigin(0, 0.5);
     this.add.text(20, 490, 'NAVI', { fontFamily: 'monospace', fontSize: '16px', color: '#e8f6ff' });
 
+    // custom gauge under the HP bar
+    this.add.text(20, 514, 'CUSTOM', { fontFamily: 'monospace', fontSize: '12px', color: '#9fb3c8' });
+    this.add.rectangle(120, 522, 220, 10, 0x101828).setOrigin(0, 0.5);
+    this.customGaugeFill = this.add.rectangle(122, 522, 0, 6, 0x00e5ff).setOrigin(0, 0.5);
+    this.customReadyText = this.add.text(348, 514, 'SHIFT!', {
+      fontFamily: 'monospace', fontSize: '14px', color: '#00e5ff',
+    }).setVisible(false);
+
+    // empty chip slot texture, drawn once
+    const g = this.make.graphics({ x: 0, y: 0 }, false);
+    g.fillStyle(0x101828, 1);
+    g.fillRoundedRect(0, 0, 48, 48, 8);
+    g.lineStyle(2, 0x334155, 1);
+    g.strokeRoundedRect(0, 0, 48, 48, 8);
+    g.generateTexture('chip-empty', 48, 48);
+    g.destroy();
+
+    // 4 loadout slots (1-4): filled from the custom screen
     this.chipIcons = [];
-    CHIPS.forEach((chip, i) => {
+    for (let i = 0; i < LOADOUT_MAX; i++) {
       const x = 420 + i * 70;
-      const icon = this.add.image(x, 500, `chip-${chip.id}`).setDisplaySize(48, 48);
+      const icon = this.add.image(x, 500, 'chip-empty').setDisplaySize(48, 48);
       const label = this.add.text(x, 530, `${i + 1}`, {
         fontFamily: 'monospace', fontSize: '14px', color: '#9fb3c8',
       }).setOrigin(0.5);
-      this.chipIcons.push({ chip, icon, label });
-    });
+      this.chipIcons.push({ icon, label });
+    }
+    this.updateLoadoutHud();
 
-    this.add.text(760, 490, 'Arrows: move   1-4: chips', {
+    this.add.text(700, 490, 'Arrows: move   1-4: chips   SHIFT: custom', {
       fontFamily: 'monospace', fontSize: '14px', color: '#9fb3c8',
     });
+  }
+
+  // refresh the 4 slot icons from the current loadout
+  updateLoadoutHud() {
+    this.chipIcons.forEach(({ icon }, i) => {
+      const id = this.loadout[i];
+      icon.setTexture(id ? `chip-${id}` : 'chip-empty');
+    });
+  }
+
+  updateCustomGaugeHud() {
+    const frac = Math.min(this.customTimer / CUSTOM_GAUGE_MS, 1);
+    this.customGaugeFill.setDisplaySize(216 * frac, 6);
+    const full = frac >= 1;
+    this.customReadyText.setVisible(full && !this.customOpen);
   }
 
   // ================= main loop =================
@@ -397,7 +603,15 @@ export default class BattleScene extends Phaser.Scene {
       this.dialogue.update(delta);
       return;
     }
+    if (this.customOpen) return; // custom screen owns the frame (game paused)
     if (this.over) return;
+    // custom gauge fills during battle; SHIFT opens the custom screen
+    if (this.customTimer < CUSTOM_GAUGE_MS) {
+      this.customTimer = Math.min(this.customTimer + delta, CUSTOM_GAUGE_MS);
+      this.updateCustomGaugeHud();
+    } else if (Phaser.Input.Keyboard.JustDown(this.customKey)) {
+      this.openCustom();
+    }
     this.handleMovement(time);
     this.handleChips(time);
     this.bossAI(time);
@@ -431,7 +645,9 @@ export default class BattleScene extends Phaser.Scene {
   handleChips(time) {
     const keyMap = [this.keys.ONE, this.keys.TWO, this.keys.THREE, this.keys.FOUR];
     keyMap.forEach((key, i) => {
-      if (Phaser.Input.Keyboard.JustDown(key)) this.fireChip(CHIPS[i], time);
+      if (!Phaser.Input.Keyboard.JustDown(key)) return;
+      const chipId = this.loadout[i];
+      if (chipId) this.fireChip(CHIP_MAP[chipId], time);
     });
   }
 
@@ -630,8 +846,9 @@ export default class BattleScene extends Phaser.Scene {
   updateHud(time) {
     const w = 216 * (this.naviHp / this.naviMaxHp);
     this.hpBar.setDisplaySize(Math.max(w, 0), 14);
-    this.chipIcons.forEach(({ chip, icon }) => {
-      icon.setAlpha(this.chipReady(chip, time) ? 1 : 0.35);
+    this.chipIcons.forEach(({ icon }, i) => {
+      const id = this.loadout[i];
+      icon.setAlpha(!id ? 0.25 : (this.chipReady(CHIP_MAP[id], time) ? 1 : 0.35));
     });
   }
 
