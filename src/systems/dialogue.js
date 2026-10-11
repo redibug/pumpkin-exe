@@ -176,7 +176,7 @@ export class DialogueUI {
 // ---- battle scripts (Mel: edit freely, simple words, short lines) ----
 export const SCRIPTS = {
   intro: [
-    { speaker: 'mel', text: 'Bugchan, I jacked you into the cyberworld. Something is wrong in there...' },
+    { speaker: 'mel', text: 'Bugchan, I logged you into the cyberworld. Something is wrong in there...' },
     { speaker: 'bugchan', text: 'Whoa! Pumpkins everywhere! And they look mad!' },
     { speaker: 'pumpkin', text: 'I AM PUMPKIN.EXE! THIS HARVEST IS MINE, LITTLE BUG!' },
     { speaker: 'bugchan', text: 'Not on my watch! Mel, send chips! I will debug this gourd!' },
@@ -191,6 +191,6 @@ export const SCRIPTS = {
   ],
   defeat: [
     { speaker: 'bugchan', text: 'Ow... I need to reboot... sorry, Mel...' },
-    { speaker: 'mel', text: "It's okay, Bugchan. Jack out. We'll try again." },
+    { speaker: 'mel', text: "It's okay, Bugchan. Log out. We'll try again." },
   ],
 };

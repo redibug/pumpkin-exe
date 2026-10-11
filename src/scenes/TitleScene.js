@@ -16,7 +16,7 @@ export default class TitleScene extends Phaser.Scene {
       fontFamily: 'monospace', fontSize: '18px', color: '#7fd4ff',
     }).setOrigin(0.5);
 
-    const start = this.add.text(width / 2, height / 2 + 80, '[ PRESS ENTER TO JACK IN ]', {
+    const start = this.add.text(width / 2, height / 2 + 80, '[ PRESS ENTER TO LOG IN ]', {
       fontFamily: 'monospace', fontSize: '22px', color: '#e8f6ff',
     }).setOrigin(0.5);
 

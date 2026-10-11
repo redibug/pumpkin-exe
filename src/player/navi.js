@@ -300,9 +300,12 @@ export const NaviMethods = {
     rows.forEach((r) => {
       // Spread: the center bullet fires from in front; the side bullets
       // come from Bugchan's side (her x) on the rows above/below.
+      // All at buster height (muzzle height), not along the ground.
       const startX = (chip.id === 'spread' && r !== this.naviPos.row) ? feet.x : feet.x + 30;
       const proj = this.makeGlowBullet(chip.color, 10);
-      proj.setPosition(startX, tileCenter(0, r).y);
+      const s = this.navi.scaleX;
+      const by = tileFeet(0, r).y - 115 * s; // buster height for this row
+      proj.setPosition(startX, by);
       proj.setDepth(10 + r); // row-ordered like other effects
       proj.setData('damage', chip.damage);
       proj.setData('row', r);

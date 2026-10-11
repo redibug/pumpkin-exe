@@ -854,7 +854,7 @@ export default class BattleScene extends Phaser.Scene {
     sound.gameOver();
     this.over = true;
     const title = this.makeFancyTitle(480, 250, 'GAME OVER', '#ff8a80', '#d32f2f', '#4a0000');
-    const sub = this.add.text(480, 320, 'press R to jack in again', {
+    const sub = this.add.text(480, 320, 'press R to log in again', {
       fontFamily: 'monospace', fontSize: '18px', color: '#9fb3c8',
     }).setOrigin(0.5).setDepth(100);
     sub.setShadow(0, 3, 'rgba(0,0,0,0.85)', 10, true, true);
