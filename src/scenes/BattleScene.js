@@ -1,175 +1,30 @@
 import Phaser from 'phaser';
 import { COLS, ROWS, project, tileCorners, tileFeet, tileCenter, isPlayerTile, gridParams, setGridParams, getGridParams, hexToRgb } from '../systems/grid.js';
 import { CHIP_MAP, DECK, BOSS } from '../systems/chips.js';
-import { ROOTABREAK } from '../systems/viruses.js';
+import { ROOTABREAK, SKITTER, SENTRY, BOMB_SPIDER, AUTOSCALE } from '../systems/viruses.js';
 import { fitFactor, FIT_MAX } from '../systems/spriteFit.js';
 import { createDebugGameplay, isDialogueSkipped } from '../systems/debugGameplay.js';
 import { createDebugOverlay } from '../systems/debugOverlay.js';
 import { DialogueUI, SCRIPTS } from '../systems/dialogue.js';
+import { BATTLES } from '../systems/battles.js';
+import { SkitterbugMethods } from '../enemies/skitterbug.js';
+import { SentryMethods } from '../enemies/sentry.js';
+import { BombSpiderMethods } from '../enemies/bombSpider.js';
+import { RootabreakMethods } from '../enemies/rootabreak.js';
+import { PumpkinMethods } from '../enemies/pumpkin.js';
 
 // BattleScene — written during the jam 72h window (2026-10-09).
 // MMBN-style grid battle: Bugchan (navi) vs PUMPKIN.EXE + RUTABAGA.MND.
 
-const M = ROOTABREAK;
 
 // Skitterbug tuning (Mel: edit freely)
-const SKITTER = {
-  maxHp: 60,
-  checkIntervalMs: 2800,  // slow cycle: each check is either a move or a spit
-  bulletSpeed: 170,       // slow-moving ichor (chips fly at 520)
-  bulletDamage: 10,
-  bulletColor: 0x9dbb2e,  // sickly yellow-green ichor
-};
-const SKITTER_MANUAL = 1;
-
-const SENTRY = {
-  maxHp: 200,
-  telegraphMs: 800,       // activated: sensor flashes red for slightly < 1s
-  cooldownMs: 1000,       // cooldown: can't do anything for 1s
-  laserDamage: 15,
-};
-const SENTRY_MANUAL = 3;
-
-const BOMB_SPIDER = {
-  maxHp: 140,
-  moveIntervalMs: 1600,   // cycle: move -> move -> throw -> repeat
-  bombDamage: 20,
-  throwDistance: 3,       // tiles forward (toward the player)
-};
-const BOMB_SPIDER_MANUAL = 1.25;
-
-// Per-enemy-type auto-scale: longest texture side auto-shrinks to fit.
-// Unlisted types use the default FIT_MAX (512).
-const AUTOSCALE = {
-  skitterbug: 120,
-  sentry: 120,
-  bombspider: 140,
-};
 
 // ---- battles ----
 // Mel: edit freely — enemy comps, names, dialogue. Simple words, short lines.
-const BATTLES = [
-  {
-    name: 'SKITTER PATROL',
-    enemies: [
-      { type: 'skitterbug', col: 3, row: 0 },
-      { type: 'skitterbug', col: 4, row: 2 },
-    ],
-    intro: [
-      { speaker: 'mel', text: 'Bugchan, I jacked you in. Two beetle viruses are crawling around in there.' },
-      { speaker: 'bugchan', text: 'Beetles with cannons?! I will debug these bugs!' },
-      { speaker: 'skitterbug', text: 'SKITTER SKITTER!' },
-    ],
-    victory: [
-      { speaker: 'bugchan', text: 'Squashed! Those beetles were slow!' },
-    ],
-    story: [
-      { speaker: 'mel', text: 'Good work. But I see roots digging nearby. Stay sharp.' },
-      { speaker: 'bugchan', text: 'Roots? Smells like rutabagas...' },
-    ],
-  },
-  {
-    name: 'SENTRY POST',
-    naviStart: { col: 0, row: 2 }, // bottom left
-    enemies: [
-      { type: 'skitterbug', col: 3, row: 0 }, // top left enemy square
-      { type: 'sentry', col: 5, row: 1 },     // far right middle
-    ],
-    intro: [
-      { speaker: 'mel', text: 'A sentry turret is guarding that lane. It only shoots when you are on its row.' },
-      { speaker: 'bugchan', text: 'Then I will stay off its row! Easy!' },
-      { speaker: 'sentry', text: 'TARGET ACQUIRED.' },
-    ],
-    victory: [
-      { speaker: 'bugchan', text: 'Turret down! It never even moved!' },
-    ],
-    story: [
-      { speaker: 'mel', text: 'Nice dodging. Something is sprouting ahead...' },
-      { speaker: 'bugchan', text: 'I smell veggies. Rutabaga veggies!' },
-    ],
-  },
-  {
-    name: 'BOMB NEST',
-    enemies: [
-      { type: 'bombspider', col: 4, row: 1 },
-    ],
-    intro: [
-      { speaker: 'mel', text: 'A spider virus carrying a bomb. It throws it at you. Do not stand still.' },
-      { speaker: 'bugchan', text: 'A bomb?! Cute spider, bad idea!' },
-      { speaker: 'bombspider', text: 'TICK TOCK!' },
-    ],
-    victory: [
-      { speaker: 'bugchan', text: 'Defused! No more bombs!' },
-    ],
-    story: [
-      { speaker: 'mel', text: 'Good. The bombs are getting bigger ahead...' },
-      { speaker: 'bugchan', text: 'Bigger bombs? I am ready!' },
-    ],
-  },
-  {
-    name: 'SPROUT PATROL',
-    enemies: [
-      { type: 'rootabreak', col: 4, row: 0 },
-      { type: 'rootabreak', col: 4, row: 2 },
-    ],
-    intro: [
-      { speaker: 'mel', text: 'Bugchan, I jacked you in. Two rootabreak viruses are digging around in there.' },
-      { speaker: 'bugchan', text: 'Smells like dirt! I will debug these roots!' },
-      { speaker: 'rootabreak', text: 'KYAAAH!!' },
-    ],
-    victory: [
-      { speaker: 'bugchan', text: 'Two down! That was easy!' },
-    ],
-    story: [
-      { speaker: 'mel', text: 'Good work. But I see more signals deeper in. Keep going.' },
-      { speaker: 'bugchan', text: 'Deeper? It smells worse down there...' },
-    ],
-  },
-  {
-    name: 'ROOT CELLAR',
-    enemies: [
-      { type: 'rootabreak', col: 3, row: 0 },
-      { type: 'rootabreak', col: 5, row: 1, big: true },
-      { type: 'rootabreak', col: 3, row: 2 },
-    ],
-    intro: [
-      { speaker: 'mel', text: 'Three this time. The big one in the middle looks mean.' },
-      { speaker: 'bugchan', text: 'Big root, big problems! Chips ready, Mel!' },
-      { speaker: 'rootabreak', text: 'KYAAAH!!' },
-    ],
-    victory: [
-      { speaker: 'bugchan', text: 'Phew! The big one almost got me!' },
-    ],
-    story: [
-      { speaker: 'mel', text: 'One signal left. It is huge. Be careful, Bugchan.' },
-      { speaker: 'bugchan', text: 'Huge? Like... pumpkin huge?' },
-      { speaker: 'pumpkin', text: 'I AM PUMPKIN.EXE! THIS HARVEST IS MINE, LITTLE BUG!' },
-    ],
-  },
-  {
-    name: 'PUMPKIN.EXE',
-    enemies: [
-      { type: 'pumpkin', col: 4, row: 1 },
-      { type: 'rootabreak', col: 5, row: 0 },
-    ],
-    intro: [
-      { speaker: 'mel', text: 'Bugchan, I jacked you into the cyberworld. Something is wrong in there...' },
-      { speaker: 'bugchan', text: 'Whoa! Pumpkins everywhere! And they look mad!' },
-      { speaker: 'pumpkin', text: 'I AM PUMPKIN.EXE! THIS HARVEST IS MINE, LITTLE BUG!' },
-      { speaker: 'bugchan', text: 'Not on my watch! Mel, send chips! I will debug this gourd!' },
-    ],
-    victory: [
-      { speaker: 'pumpkin', text: 'NO... MY HARVEST... ROTTING...' },
-      { speaker: 'bugchan', text: 'Virus deleted! Good work, Mel!' },
-    ],
-    story: [], // last battle: no story after, goes to ending
-  },
-];
 
 // Manual artistic scales on top of the auto-fit + perspective scale.
 const NAVI_MANUAL = 1;
 const BOSS_MANUAL = 0.5;
-const MANDRAKE_MANUAL = 1.25;
 
 // ---- custom screen / deck ----
 const CUSTOM_GAUGE_MS = 10000; // battle time to fill the custom gauge
@@ -362,8 +217,6 @@ export default class BattleScene extends Phaser.Scene {
         if (e.type === 'pumpkin') {
           e.nextMove = now + 1400;
           e.nextAttack = now + 2200;
-        } else if (e.type === 'rootabreak') {
-          e.timer = now + M.burrowedMs;
         } else if (e.type === 'skitterbug') {
           e.nextCheck = now + 1500;
         }
@@ -374,214 +227,14 @@ export default class BattleScene extends Phaser.Scene {
 
   // ================= enemies =================
 
-  spawnPumpkin(col, row) {
-    const bp = tileFeet(col, row);
-    const sprite = this.physics.add.sprite(bp.x, bp.y, 'boss');
-    sprite.setData('fitMax', AUTOSCALE.pumpkin ?? FIT_MAX);
-    sprite.setOrigin(0.5, 1); // viruses stand on their tiles too
-    this.placeFighter(sprite, col, row, BOSS_MANUAL);
-    const enemy = {
-      type: 'pumpkin', sprite, col, row,
-      hp: BOSS.maxHp, maxHp: BOSS.maxHp, alive: true,
-      nextMove: 0, nextAttack: 0,
-      hpBar: this.makeHpBar(),
-    };
-    this.enemies.push(enemy);
-    return enemy;
-  }
 
-  spawnRootabreak(col, row, big = false) {
-    const mp = tileFeet(col, row);
-    const mc = tileCenter(col, row);
-    // planted: sprout visible, main sprite hidden
-    // centered on the tile (it's rooted, not standing)
-    const sprout = this.add.image(mc.x, mc.y, 'rootabreak-sprout');
-    sprout.setOrigin(0.5, 0.9);
-    sprout.setScale(mp.s * 0.9).setDepth(9 + row);
-    const sprite = this.physics.add.sprite(mc.x, mc.y, 'rootabreak').setVisible(false);
-    sprite.setData('fitMax', AUTOSCALE.rootabreak ?? FIT_MAX);
-    sprite.setOrigin(0.5, 0.9); // lifted off the tile surface
-    if (big) sprite.setTint(0xffab91); // big one: slightly red tint
-    this.placeFighter(sprite, col, row, MANDRAKE_MANUAL * (big ? 1.35 : 1));
-    // override placeFighter's feet positioning: center on the tile
-    sprite.setPosition(mc.x, mc.y);
-    // align sprout's bottom with the main sprite's bottom (different sizes,
-    // same origin) so the plant/replant transition doesn't jump
-    const sproutY = sprite.y + 0.1 * (sprite.displayHeight - sprout.displayHeight);
-    sprout.setPosition(mc.x, sproutY);
-    // store the home position for the leap (sprite returns here)
-    const homeY = sprite.y;
-    const maxHp = big ? M.maxHp * 2 : M.maxHp;
-    const enemy = {
-      type: 'rootabreak', sprite, sprout, col, row, homeY, sproutY,
-      hp: maxHp, maxHp, alive: true, big,
-      state: 'planted', // planted | leaping | screaming | falling
-      nextJump: -1, // init on first AI tick (column-synced)
-      screamText: null, wiggleTween: null,
-      sproutPopping: false, // true during the replant pop-in (idle pauses)
-      hpBar: this.makeHpBar(),
-    };
-    // Sprout idle: gentle squash-and-stretch like skitterbug (feet planted)
-    enemy.sproutBaseScaleX = sprout.scaleX;
-    enemy.sproutBaseScaleY = sprout.scaleY;
-    enemy.sproutSquash = { v: 0 };
-    enemy.sproutBob = this.tweens.add({
-      targets: enemy.sproutSquash,
-      v: 1,
-      duration: 900 + Math.random() * 400, // desync per plant
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-      onUpdate: () => {
-        if (!enemy.alive) return;
-        if (enemy.state !== 'planted' || !enemy.sprout.visible) return;
-        if (enemy.sproutPopping) return; // pop-in owns the scale
-        const k = enemy.sproutSquash.v;
-        enemy.sprout.setScale(
-          enemy.sproutBaseScaleX * (1 + 0.03 * k), // wider
-          enemy.sproutBaseScaleY * (1 - 0.05 * k)  // shorter
-        );
-      },
-    });
-    this.enemies.push(enemy);
-    return enemy;
-  }
 
-  spawnSkitterbug(col, row) {
-    const sprite = this.physics.add.sprite(0, 0, 'skitterbug');
-    sprite.setData('fitMax', AUTOSCALE.skitterbug ?? FIT_MAX);
-    sprite.setOrigin(0.5, 1);
-    this.placeFighter(sprite, col, row, SKITTER_MANUAL);
-    const enemy = {
-      type: 'skitterbug', sprite, col, row,
-      hp: SKITTER.maxHp, maxHp: SKITTER.maxHp, alive: true,
-      nextCheck: 0,
-      moveIntent: Math.random() < 0.5 ? -1 : 1, // -1 = up, 1 = down
-      canSpit: false, // starts with a move (move, spit, move, spit...)
-      shootAnim: false, // true while the shoot tween is playing
-      hpBar: this.makeHpBar(),
-    };
-    // Idle bob as an INFINITE tween (keeps playing during pause, per the
-    // standing rule). Squash-and-stretch on SCALE, not y — the sprite is
-    // anchored at bottom-center (origin 0.5,1), so the feet stay planted.
-    enemy.baseScaleX = sprite.scaleX;
-    enemy.baseScaleY = sprite.scaleY;
-    enemy.squash = { v: 0 };
-    enemy.bobTween = this.tweens.add({
-      targets: enemy.squash,
-      v: 1,
-      duration: 700 + Math.random() * 300, // desync per bug
-      yoyo: true,
-      repeat: -1, // infinite: survives setPaused
-      ease: 'Sine.easeInOut',
-      onUpdate: () => {
-        if (!enemy.alive) return;
-        if (sprite.getData('teleporting') || enemy.shootAnim) return;
-        const k = enemy.squash.v;
-        sprite.setScale(
-          enemy.baseScaleX * (1 + 0.04 * k), // wider
-          enemy.baseScaleY * (1 - 0.06 * k)  // shorter
-        );
-      },
-    });
-    this.enemies.push(enemy);
-    return enemy;
-  }
 
-  spawnSentry(col, row) {
-    // Stationary turret. State machine: ready (watching) -> activated
-    // (sensor flashing red, ~800ms) -> fires piercing hitscan laser ->
-    // cooldown (1s, does nothing) -> ready.
-    const sprite = this.physics.add.sprite(0, 0, 'sentry');
-    sprite.setData('fitMax', AUTOSCALE.sentry ?? FIT_MAX);
-    sprite.setOrigin(0.75, 1);
-    this.placeFighter(sprite, col, row, SENTRY_MANUAL);
-    // sensor light: red dot at the indicator on the sprite (74.5% from
-    // left, 43.8% from top); flashes when activated.
-    // Origin is (0.75, 1), so offset from sprite.x/y accordingly.
-    const sensor = this.add.circle(
-      sprite.x + (0.7449 - 0.75) * sprite.displayWidth,
-      sprite.y + (0.4375 - 1.0) * sprite.displayHeight,
-      7, 0xff3b30
-    );
-    sensor.setDepth(sprite.depth + 1);
-    sensor.setVisible(false);
-    const enemy = {
-      type: 'sentry', sprite, sensor, col, row,
-      hp: SENTRY.maxHp, maxHp: SENTRY.maxHp, alive: true,
-      state: 'ready', // ready | activated | cooldown
-      cooldownUntil: 0,
-      hpBar: this.makeHpBar(),
-      baseX: sprite.x, baseY: sprite.y, // home position (for kickback reset)
-    };
-    this.enemies.push(enemy);
-    return enemy;
-  }
 
-  spawnBombSpider(col, row) {
-    // Bomb Spider (rebranded Jack): walks randomly, carries a bomb on its
-    // back. At intervals it throws the bomb 3 tiles forward (toward player);
-    // on landing it damages the 3x3 area. Bomb is composited in-engine:
-    // a separate sprite on the back (hidden while thrown).
-    const sprite = this.physics.add.sprite(0, 0, 'bomb-spider');
-    sprite.setData('fitMax', AUTOSCALE.bombspider ?? FIT_MAX);
-    sprite.setOrigin(0.5, 1);
-    this.placeFighter(sprite, col, row, BOMB_SPIDER_MANUAL);
-    // bomb on the back: sits at the abdomen, layered BEHIND the spider
-    const bombBack = this.add.sprite(0, 0, 'bomb');
-    bombBack.play('bomb-fuse');
-    bombBack.setOrigin(0.5, 0.5);
-    // scale bomb relative to spider (bomb art is 64px, spider is 128px wide)
-    const bombScale = sprite.scaleX * 0.9;
-    bombBack.setScale(bombScale);
-    bombBack.setDepth(sprite.depth - 0.5); // behind the spider
-    this.positionBombBack({ sprite, bombBack });
-    const enemy = {
-      type: 'bombspider', sprite, bombBack, col, row,
-      hp: BOMB_SPIDER.maxHp, maxHp: BOMB_SPIDER.maxHp, alive: true,
-      nextMove: 0,
-      movesDone: 0, // cycle: move -> move -> throw -> repeat
-      hasBomb: true, // false while the thrown bomb is in the air
-      hpBar: this.makeHpBar(),
-    };
-    // Idle: same squash-and-stretch as skitterbug (feet planted, scale only)
-    enemy.baseScaleX = sprite.scaleX;
-    enemy.baseScaleY = sprite.scaleY;
-    enemy.squash = { v: 0 };
-    enemy.bobTween = this.tweens.add({
-      targets: enemy.squash,
-      v: 1,
-      duration: 700 + Math.random() * 300,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-      onUpdate: () => {
-        if (!enemy.alive) return;
-        if (sprite.getData('teleporting')) return;
-        const k = enemy.squash.v;
-        sprite.setScale(
-          enemy.baseScaleX * (1 + 0.04 * k),
-          enemy.baseScaleY * (1 - 0.06 * k)
-        );
-      },
-    });
-    this.enemies.push(enemy);
-    return enemy;
-  }
 
   // Position the back-bomb at the spider's abdomen, layered behind.
   // Offset up and to the right so it peeks out from behind the body.
   // Scale follows the spider's perspective scale AND idle squash.
-  positionBombBack(e) {
-    const s = e.sprite;
-    e.bombBack.setPosition(
-      s.x + s.displayWidth * 0.28,
-      s.y - s.displayHeight * 0.72
-    );
-    // inherit the spider's current scale (incl. squash) on both axes
-    e.bombBack.setScale(s.scaleX * 0.9, s.scaleY * 0.9);
-    e.bombBack.setDepth(s.depth - 0.5); // behind the spider
-  }
 
   // HP number floating above an enemy's head
   makeHpBar() {
@@ -1263,7 +916,7 @@ export default class BattleScene extends Phaser.Scene {
     this.drawGrid();
     this.placeFighter(this.navi, this.naviPos.col, this.naviPos.row, NAVI_MANUAL);
     for (const e of this.enemies) {
-      const manual = e.type === 'pumpkin' ? BOSS_MANUAL : MANDRAKE_MANUAL * (e.big ? 1.35 : 1);
+      const manual = e.type === 'pumpkin' ? BOSS_MANUAL : ROOTABREAK.manualScale * (e.big ? 1.35 : 1);
       if (e.type === 'rootabreak' && !e.sprite.visible) continue;
       this.placeFighter(e.sprite, e.col, e.row, manual);
       if (e.type === 'rootabreak') {
@@ -1794,449 +1447,27 @@ export default class BattleScene extends Phaser.Scene {
     }
   }
 
-  bossPhase(enemy) {
-    const frac = enemy.hp / enemy.maxHp;
-    if (frac < 0.3) return BOSS.phases[2]; // Harvest
-    if (frac < 0.6) return BOSS.phases[1];  // Vine
-    return BOSS.phases[0];                  // Sprout
-  }
 
-  pumpkinAI(e, time) {
-    const phase = this.bossPhase(e);
-
-    // wander enemy columns
-    if (time >= e.nextMove) {
-      e.nextMove = time + phase.moveIntervalMs;
-      const nc = Phaser.Math.Between(3, 5);
-      const nr = Phaser.Math.Between(0, ROWS - 1);
-      e.col = nc; e.row = nr;
-      this.teleportMove(e.sprite, nc, nr, BOSS_MANUAL);
-    }
-
-    // telegraphed tile slam on the navi's tile
-    if (time >= e.nextAttack) {
-      e.nextAttack = time + phase.attackIntervalMs;
-      const target = { col: this.naviPos.col, row: this.naviPos.row };
-      const warn = this.highlightTile(target.col, target.row, 0xff5252, 0.4);
-      this.time.delayedCall(700, () => {
-        warn.destroy();
-        if (this.over) return;
-        // hit if navi is still on the warned tile
-        if (this.naviPos.col === target.col && this.naviPos.row === target.row) {
-          this.damageNavi(20);
-        }
-        const bc = tileCenter(target.col, target.row);
-        const boom = this.add.circle(bc.x, bc.y, 40, 0xff9e2c, 0.5);
-        boom.setDepth(10 + target.row); // above the floor, ordered by row
-        this.tweens.add({ targets: boom, alpha: 0, scale: 1.6, duration: 250,
-          onComplete: () => boom.destroy() });
-      });
-    }
-  }
 
   // ================= mandrake AI =================
 
-  rootabreakAI(md, time) {
-    if (!md.alive) return;
-    // init jump timer on first tick: column-synced (same col jumps together,
-    // each column to the right is slightly delayed)
-    if (md.nextJump < 0) {
-      md.nextJump = time + M.plantedMs + (md.col - 3) * M.columnDelayMs;
-      return;
-    }
-    if (md.state !== 'planted' || time < md.nextJump) return;
 
-    // LEAP: hide sprout, show sprite
-    md.state = 'leaping';
-    md.sprout.setVisible(false);
-    md.sprite.setVisible(true);
-    const manual = MANDRAKE_MANUAL * (md.big ? 1.35 : 1);
-    this.placeFighter(md.sprite, md.col, md.row, manual);
-    // center on the tile (not feet)
-    const mc = tileCenter(md.col, md.row);
-    md.sprite.setPosition(mc.x, mc.y);
-    const airHomeY = md.sprite.y;
-    // pop-in scale
-    const targetScale = md.sprite.scaleX;
-    md.sprite.setScale(targetScale * 0.3);
-    this.tweens.add({
-      targets: md.sprite, scaleX: targetScale, scaleY: targetScale,
-      duration: 150, ease: 'Back.easeOut',
-    });
-    // wiggle while airborne: gentle rotation
-    md.wiggleTween = this.tweens.add({
-      targets: md.sprite, angle: 6,
-      duration: 200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
-    });
-    // leap up
-    this.tweens.add({
-      targets: md.sprite, y: airHomeY - M.leapHeightPx,
-      duration: M.leapMs, ease: 'Quad.easeOut',
-      onComplete: () => {
-        if (!md.alive) return;
-        // SCREAM at peak: KYAAH! floats up and fades, sound waves out
-        // (from the sprite's air position, not the ground)
-        md.state = 'screaming';
-        const sx = md.sprite.x, sy = md.sprite.y;
-        md.screamText = this.add.text(sx, sy - 60, 'KYAAAH!!', {
-          fontFamily: 'monospace', fontSize: '22px', color: '#ce93d8',
-          stroke: '#2a0a2a', strokeThickness: 4,
-        }).setOrigin(0.5).setDepth(10 + md.row);
-        // float up slowly and fade out (longer-lived)
-        // shake: intense at first, still by half duration (decaying amplitude)
-        const baseX = sx;
-        const shake = { t: 0 };
-        this.tweens.add({
-          targets: shake, t: 1, duration: 1800, ease: 'Linear',
-          onUpdate: () => {
-            if (!md.screamText || !md.screamText.active) return;
-            const amp = (1 - shake.t) * 10; // 10px -> 0
-            md.screamText.x = baseX + Phaser.Math.Between(-amp, amp);
-          },
-          onComplete: () => {
-            if (md.screamText && md.screamText.active) md.screamText.x = baseX;
-          },
-        });
-        this.tweens.add({
-          targets: md.screamText, y: sy - 80, alpha: 0,
-          duration: 1800*2, ease: 'Quad.easeOut',
-          onComplete: () => {
-            if (md.screamText) { md.screamText.destroy(); md.screamText = null; }
-          },
-        });
-        this.spawnNoiseWave(md, -1); // left
-        this.spawnNoiseWave(md, 1);  // right
-        if (!this.mandrakeGagged) {
-          this.mandrakeGagged = true;
-          this.startDialogue(SCRIPTS.mandrakeGag);
-        }
-        // hang at peak briefly, then fall
-        this.time.delayedCall(350, () => {
-          if (!md.alive) return;
-          md.state = 'falling';
-          this.tweens.add({
-            targets: md.sprite, y: airHomeY,
-            duration: M.leapMs, ease: 'Quad.easeIn',
-            onComplete: () => {
-              if (!md.alive) return;
-              // stop the wiggle
-              if (md.wiggleTween) { md.wiggleTween.stop(); md.wiggleTween = null; }
-              md.sprite.setAngle(0);
-              // LAND: scale down (reverse of pop-in), then re-plant
-              this.tweens.add({
-                targets: md.sprite, scaleX: 0, scaleY: 0,
-                duration: 130, ease: 'Quad.easeIn',
-                onComplete: () => {
-                  if (!md.alive) return;
-                  md.state = 'planted';
-                  md.sprite.setVisible(false);
-                  // sprout pops in at the bottom-aligned position
-                  md.sprout.setPosition(md.sprite.x, md.sproutY).setVisible(true);
-                  md.sproutPopping = true;
-                  md.sprout.setScale(0);
-                  // refresh base scale (perspective may have changed)
-                  const mp = tileFeet(md.col, md.row);
-                  md.sproutBaseScaleX = mp.s * 0.9;
-                  md.sproutBaseScaleY = mp.s * 0.9;
-                  this.tweens.add({
-                    targets: md.sprout, scaleX: md.sproutBaseScaleX, scaleY: md.sproutBaseScaleY,
-                    duration: 160, ease: 'Back.easeOut',
-                    onComplete: () => { md.sproutPopping = false; },
-                  });
-                  md.nextJump = this.time.now + M.plantedMs + (md.col - 3) * M.columnDelayMs;
-                },
-              });
-            },
-          });
-        });
-      },
-    });
-  }
-
-  spawnNoiseWave(md, dir) {
-    // Sound wave: vertical arc, endpoints toward the rootabreak, bulging
-    // outward — like a ripple tracing a circle around them.
-    // Spawns at the sprite's air position with perspective scale.
-    // The arc's leading edge (bulge) is at local x=0 so the hitbox (proj.x)
-    // lines up with the visual.
-    const g = this.add.graphics();
-    const color = 0xce93d8;
-    g.lineStyle(4, color, 0.9);
-    // arc: radius 34, spanning ~100 degrees. Circle center offset so the
-    // bulge (leading edge) sits at x=0.
-    const radius = 34;
-    const halfAngle = Phaser.Math.DegToRad(50);
-    if (dir > 0) {
-      // right side: bulge at x=0, circle center to the left
-      g.arc(-radius, 0, radius, -halfAngle, halfAngle, false);
-    } else {
-      // left side: bulge at x=0, circle center to the right
-      g.arc(radius, 0, radius, Math.PI - halfAngle, Math.PI + halfAngle, false);
-    }
-    g.strokePath();
-    // perspective: match the sprite's scale (going forward, all projectiles
-    // should inherit perspective from their source)
-    const ps = md.sprite.scaleX;
-    g.setPosition(md.sprite.x, md.sprite.y);
-    g.setScale(ps);
-    g.setDepth(10 + md.row);
-    g.setData('vx', dir * M.noiseSpeed);
-    g.setData('row', md.row);
-    g.setData('damage', M.screamDamage);
-    g.setData('expand', 0); // tracks expansion for the update loop
-    g.setData('baseScale', ps); // perspective scale (expansion multiplies this)
-    this.enemyProjectiles.add(g);
-  }
 
   // ================= skitterbug AI =================
   // Slow cycle: move, spit, move, spit...
   // Each check: if the navi is on our row and we can spit -> spit.
   // Otherwise move (up/down by intent). Can't spit twice without moving.
 
-  skitterbugAI(e, time) {
-    if (time < e.nextCheck) return;
-    e.nextCheck = time + SKITTER.checkIntervalMs;
 
-    if (e.canSpit && this.naviPos.row === e.row) {
-      this.spitIchor(e);
-      e.canSpit = false;
-      return;
-    }
-    // move: try the intended direction first
-    let dir = e.moveIntent;
-    let nr = e.row + dir;
-    if (nr < 0 || nr >= ROWS) {
-      dir = -dir; // blocked: flip intent, try the other way
-      nr = e.row + dir;
-    }
-    if (nr < 0 || nr >= ROWS) {
-      // can't move either way: regain spit, sit tight until next check
-      e.canSpit = true;
-      return;
-    }
-    e.moveIntent = dir;
-    e.row = nr;
-    this.teleportMove(e.sprite, e.col, e.row, SKITTER_MANUAL, () => {
-      // refresh base scale after the move (perspective may differ by row)
-      e.baseScaleX = e.sprite.scaleX;
-      e.baseScaleY = e.sprite.scaleY;
-    });
-    e.canSpit = true; // moving restores the spit
-  }
 
-  sentryAI(e, time) {
-    if (!e.alive || this.over) return;
-
-    if (e.state === 'cooldown') {
-      if (time >= e.cooldownUntil) {
-        e.state = 'ready';
-      }
-      return;
-    }
-    if (e.state === 'activated') return; // fire timer is pending
-
-    // ready: the moment the navi steps onto its row, activate
-    if (this.naviPos.row !== e.row) return;
-    e.state = 'activated';
-
-    // sensor light flashes red for slightly less than a second
-    e.sensor.setVisible(true);
-    e.sensor.setAlpha(1);
-    this.tweens.add({
-      targets: e.sensor, alpha: 0.15, duration: 100, yoyo: true, repeat: 7,
-    });
-
-    this.time.delayedCall(SENTRY.telegraphMs, () => {
-      if (!e.alive || this.over) { e.state = 'ready'; e.sensor.setVisible(false); return; }
-      this.fireSentryLaser(e);
-      e.state = 'cooldown';
-      e.cooldownUntil = this.time.now + SENTRY.cooldownMs;
-      e.sensor.setVisible(false);
-    });
-  }
-
-  fireSentryLaser(e) {
-    // Instant piercing hitscan (like the railgun chip, but firing left at
-    // the navi). Powerful kickback shoves the sentry right slightly.
-    const s = e.sprite;
-    const baseX = s.x;
-    this.tweens.add({
-      targets: s, x: baseX + 14, duration: 90, yoyo: true, ease: 'Quad.easeOut',
-      onComplete: () => { if (s.active) s.setX(baseX); },
-    });
-
-    // red beam from the cannon muzzle (left edge, 33.9% from top) leftwards.
-    // Origin is (0.75, 1).
-    const mx = s.x + (0.0 - 0.75) * s.displayWidth;
-    const my = s.y + (0.3390 - 1.0) * s.displayHeight;
-    const beam = this.add.line(0, 0, 30, my, mx, my, 0xff3b30).setOrigin(0, 0);
-    beam.setLineWidth(6).setAlpha(0.95);
-    beam.setDepth(10 + e.row);
-    this.tweens.add({ targets: beam, alpha: 0, duration: 160, onComplete: () => beam.destroy() });
-
-    // hitscan: if the navi is on the row when it fires, she takes the hit
-    if (this.naviPos.row === e.row) {
-      this.damageNavi(SENTRY.laserDamage);
-      this.flash(this.navi, 0xff3b30);
-    }
-  }
 
   // Keep back-bombs synced to their spiders (position + squash).
   // Runs every frame, even when paused — it's a visual follow, not game timing.
-  syncBombBacks() {
-    for (const e of this.enemies) {
-      if (e.type !== 'bombspider' || !e.bombBack || !e.alive) continue;
-      e.bombBack.setVisible(e.hasBomb && e.sprite.visible);
-      if (e.hasBomb && e.sprite.visible) this.positionBombBack(e);
-    }
-  }
 
-  bombSpiderAI(e, time) {
-    // Cycle: move -> move -> throw -> repeat
-    if (time >= e.nextMove) {
-      e.nextMove = time + BOMB_SPIDER.moveIntervalMs;
-      if (e.movesDone >= 3) {
-        // time to throw (if carrying the bomb)
-        if (e.hasBomb) {
-          this.throwBomb(e);
-        }
-        e.movesDone = 0;
-      } else {
-        // do a move: try all 4 directions in random order
-        const dirs = Phaser.Utils.Array.Shuffle([[-1, 0], [1, 0], [0, -1], [0, 1]]);
-        for (const [dc, dr] of dirs) {
-          const nc = Phaser.Math.Clamp(e.col + dc, 3, 5);
-          const nr = Phaser.Math.Clamp(e.row + dr, 0, ROWS - 1);
-          if (nc !== e.col || nr !== e.row) {
-            e.col = nc; e.row = nr;
-            this.teleportMove(e.sprite, e.col, e.row, BOMB_SPIDER_MANUAL, () => {
-              // refresh base scale after the move (perspective may differ by row)
-              e.baseScaleX = e.sprite.scaleX;
-              e.baseScaleY = e.sprite.scaleY;
-              this.positionBombBack(e);
-            });
-            this.positionBombBack(e);
-            break;
-          }
-        }
-        e.movesDone++;
-      }
-    }
-  }
 
-  throwBomb(e) {
-    e.hasBomb = false;
-    e.bombBack.setVisible(false);
-    // target: 3 tiles forward (toward player), same row; clamp to grid
-    const targetCol = Math.max(0, e.col - BOMB_SPIDER.throwDistance);
-    const targetRow = e.row;
-    // red warning indicators on the affected tiles (plus-shape)
-    const warns = [];
-    const tiles = [[targetCol, targetRow],
-      [targetCol - 1, targetRow], [targetCol + 1, targetRow],
-      [targetCol, targetRow - 1], [targetCol, targetRow + 1]];
-    for (const [c, r] of tiles) {
-      if (c >= 0 && c < COLS && r >= 0 && r < ROWS) {
-        warns.push(this.highlightTile(c, r, 0xff3b30, 0.35));
-      }
-    }
-    e.bombWarns = warns;
-    const startX = e.sprite.x, startY = e.sprite.y - e.sprite.displayHeight * 0.7;
-    const end = tileFeet(targetCol, targetRow);
-    // flying bomb: same art, fuse anim, rotates slowly in flight
-    const bomb = this.add.sprite(startX, startY, 'bomb');
-    bomb.play('bomb-fuse');
-    bomb.setScale(e.sprite.scaleX * 0.9);
-    bomb.setDepth(20); // above everything while flying
-    const proxy = { t: 0 };
-    const arcH = 190; // higher arc
-    this.tweens.add({
-      targets: proxy, t: 1, duration: 1050, ease: 'Linear', // longer flight
-      onUpdate: () => {
-        const t = proxy.t;
-        const x = startX + (end.x - startX) * t;
-        const y = startY + (end.y - startY) * t - Math.sin(t * Math.PI) * arcH;
-        bomb.setPosition(x, y);
-        bomb.angle += 5; // slow rotation
-      },
-      onComplete: () => this.landBomb(bomb, targetCol, targetRow, e),
-    });
-  }
 
-  landBomb(bomb, col, row, e) {
-    bomb.destroy();
-    // clear the warning indicators
-    if (e.bombWarns) {
-      e.bombWarns.forEach((w) => w.destroy());
-      e.bombWarns = null;
-    }
-    // explosion flash on the landing tile
-    const c = tileCenter(col, row);
-    const boom = this.add.circle(c.x, c.y, 10, 0xff6f00).setDepth(20);
-    this.tweens.add({
-      targets: boom, scaleX: 4, scaleY: 2.5, alpha: 0,
-      duration: 280, ease: 'Quad.easeOut',
-      onComplete: () => boom.destroy(),
-    });
-    // damage: landing tile + orthogonal adjacent (plus-shape, no diagonals)
-    const nc = this.naviPos.col, nr = this.naviPos.row;
-    const manhattan = Math.abs(nc - col) + Math.abs(nr - row);
-    if (manhattan <= 1) {
-      this.damageNavi(BOMB_SPIDER.bombDamage);
-      this.flash(this.navi, 0xff6f00);
-    }
-    // reload: bomb readied immediately on explosion
-    if (e.alive) {
-      e.hasBomb = true;
-      this.positionBombBack(e);
-      e.bombBack.setVisible(true);
-    }
-  }
 
-  spitIchor(e) {
-    // shoot animation: rear up (squash), then snap forward as the bullet fires
-    const s = e.sprite;
-    const bx = s.scaleX, by = s.scaleY;
-    e.shootAnim = true;
-    this.tweens.killTweensOf(s);
-    this.tweens.add({
-      targets: s,
-      scaleX: bx * 0.9,
-      scaleY: by * 1.12,
-      duration: 90,
-      ease: 'Quad.easeIn',
-      onComplete: () => {
-        // fire!
-        this.tweens.add({
-          targets: s,
-          scaleX: bx * 1.12,
-          scaleY: by * 0.9,
-          duration: 70,
-          ease: 'Quad.easeOut',
-          yoyo: true,
-          onComplete: () => {
-            s.setScale(bx, by);
-            e.shootAnim = false;
-          },
-        });
-        this.spawnIchorBullet(e);
-      },
-    });
-  }
 
-  spawnIchorBullet(e) {
-    const p = tileCenter(e.col, e.row);
-    const bullet = this.add.circle(p.x - 20, p.y, 8, SKITTER.bulletColor);
-    bullet.setDepth(10 + e.row);
-    // perspective: inherit from the shooter (going forward, all projectiles do this)
-    const ps = e.sprite.scaleX;
-    bullet.setScale(ps);
-    bullet.setData('vx', -SKITTER.bulletSpeed);
-    bullet.setData('row', e.row);
-    bullet.setData('damage', SKITTER.bulletDamage);
-    this.enemyProjectiles.add(bullet);
-    this.tweens.add({ targets: bullet, scaleX: ps * 1.4, scaleY: ps * 1.4, duration: 120, yoyo: true });
-  }
 
   updateEnemyProjectiles(delta) {
     const dt = delta / 1000;
@@ -2459,3 +1690,11 @@ export default class BattleScene extends Phaser.Scene {
     this.input.keyboard.on('keydown', advance);
   }
 }
+
+// Enemy methods are defined in src/enemies/*.js and mixed in here,
+// so `this` inside those methods is the scene.
+Object.assign(BattleScene.prototype, SkitterbugMethods);
+Object.assign(BattleScene.prototype, SentryMethods);
+Object.assign(BattleScene.prototype, BombSpiderMethods);
+Object.assign(BattleScene.prototype, RootabreakMethods);
+Object.assign(BattleScene.prototype, PumpkinMethods);
