@@ -177,6 +177,7 @@ export default class BattleScene extends Phaser.Scene {
 
     // ---- debug overlay: only with ?debug=true in URL ----
     const debugMode = new URLSearchParams(window.location.search).get('debug') === 'true';
+    console.log('[debug] URL:', window.location.href, '| debugMode:', debugMode);
     this.debugMode = debugMode;
     if (debugMode) {
       this.debugOverlay = createDebugOverlay({
