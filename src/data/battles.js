@@ -17,8 +17,8 @@ export const BATTLES = [
       { speaker: 'bugchan', text: 'Squashed! Those beetles were slow!' },
     ],
     story: [
-      { speaker: 'mel', text: 'Good work. But I see roots digging nearby. Stay sharp.' },
-      { speaker: 'bugchan', text: 'Roots? Smells like rutabagas...' },
+      { speaker: 'mel', text: 'Good work. I see a turret guarding the next lane. Watch its row.' },
+      { speaker: 'bugchan', text: 'A turret? I will stay off its row!' },
     ],
   },
   {
@@ -37,8 +37,8 @@ export const BATTLES = [
       { speaker: 'bugchan', text: 'Turret down! It never even moved!' },
     ],
     story: [
-      { speaker: 'mel', text: 'Nice dodging. Something is sprouting ahead...' },
-      { speaker: 'bugchan', text: 'I smell veggies. Rutabaga veggies!' },
+      { speaker: 'mel', text: 'Nice dodging. Next up is a bomb spider. Do not stand still.' },
+      { speaker: 'bugchan', text: 'Bombs?! I will keep moving!' },
     ],
   },
   {
@@ -55,8 +55,8 @@ export const BATTLES = [
       { speaker: 'bugchan', text: 'Defused! No more bombs!' },
     ],
     story: [
-      { speaker: 'mel', text: 'Good. The bombs are getting bigger ahead...' },
-      { speaker: 'bugchan', text: 'Bigger bombs? I am ready!' },
+      { speaker: 'mel', text: 'Good. Now I am picking up root signals. Something is digging.' },
+      { speaker: 'bugchan', text: 'Digging? Smells like dirt...' },
     ],
   },
   {
@@ -66,7 +66,7 @@ export const BATTLES = [
       { type: 'rootabreak', col: 4, row: 2 },
     ],
     intro: [
-      { speaker: 'mel', text: 'Bugchan, I jacked you in. Two rootabreak viruses are digging around in there.' },
+      { speaker: 'mel', text: 'Two rootabreak viruses. They hide underground, then jump out screaming.' },
       { speaker: 'bugchan', text: 'Smells like dirt! I will debug these roots!' },
       { speaker: 'rootabreak', text: 'KYAAAH!!' },
     ],
@@ -74,8 +74,8 @@ export const BATTLES = [
       { speaker: 'bugchan', text: 'Two down! That was easy!' },
     ],
     story: [
-      { speaker: 'mel', text: 'Good work. But I see more signals deeper in. Keep going.' },
-      { speaker: 'bugchan', text: 'Deeper? It smells worse down there...' },
+      { speaker: 'mel', text: 'The plants are spreading. I see turrets tangled in vines ahead.' },
+      { speaker: 'bugchan', text: 'Plants and turrets? Weird combo!' },
     ],
   },
   {
@@ -87,16 +87,16 @@ export const BATTLES = [
       { type: 'skitterbug-green', col: 4, row: 2 },  // middle bottom (fast)
     ],
     intro: [
-      { speaker: 'mel', text: 'Turrets on the right, and those beetles look... greener? Faster?' },
-      { speaker: 'bugchan', text: 'Green means go! I will debug them anyway!' },
+      { speaker: 'mel', text: 'Turrets wrapped in vines, and green beetles. They are faster than normal.' },
+      { speaker: 'bugchan', text: 'Fast and green! I will still squash them!' },
       { speaker: 'sentry', text: 'TARGET ACQUIRED.' },
     ],
     victory: [
       { speaker: 'bugchan', text: 'Fast or not, they are squashed!' },
     ],
     story: [
-      { speaker: 'mel', text: 'The roots are getting tangled with something else...' },
-      { speaker: 'bugchan', text: 'Tangled? Like my cables after a long night!' },
+      { speaker: 'mel', text: 'The roots and bombs are nesting together now. Be careful.' },
+      { speaker: 'bugchan', text: 'Roots AND bombs? Double trouble!' },
     ],
   },
   {
@@ -107,8 +107,8 @@ export const BATTLES = [
       { type: 'rootabreak', col: 5, row: 2 },  // bottom right
     ],
     intro: [
-      { speaker: 'mel', text: 'Roots and a bomb spider? This nest is a mess.' },
-      { speaker: 'bugchan', text: 'Messy nest, clean debug! Chips ready!' },
+      { speaker: 'mel', text: 'A nest. Roots on the edges, spider in the middle with bombs.' },
+      { speaker: 'bugchan', text: 'Messy nest! I will clean it up!' },
       { speaker: 'rootabreak', text: 'KYAAAH!!' },
     ],
     victory: [
