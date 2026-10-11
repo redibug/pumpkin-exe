@@ -62,8 +62,9 @@ export const BATTLES = [
   {
     name: 'ROOT CELLAR',
     enemies: [
-      { type: 'rootabreak', col: 4, row: 0 },
+      { type: 'rootabreak', col: 3, row: 0 },
       { type: 'rootabreak', col: 4, row: 2 },
+      { type: 'rootabreak', col: 5, row: 1 },
     ],
     intro: [
       { speaker: 'mel', text: 'Two rootabreak viruses. They hide underground, then jump out screaming.' },
