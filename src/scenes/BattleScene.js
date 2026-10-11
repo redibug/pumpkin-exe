@@ -393,13 +393,18 @@ export default class BattleScene extends Phaser.Scene {
   spawnRootabreak(col, row, big = false) {
     const mp = tileFeet(col, row);
     // planted: sprout visible, main sprite hidden
-    const sprout = this.add.image(mp.x, mp.y - 8, 'rootabreak-sprout');
+    // sprout origin (0.5, 1): bottom sits at the feet line
+    const sprout = this.add.image(mp.x, mp.y, 'rootabreak-sprout');
+    sprout.setOrigin(0.5, 1);
     sprout.setScale(mp.s * 0.9).setDepth(9 + row);
     const sprite = this.physics.add.sprite(mp.x, mp.y, 'rootabreak').setVisible(false);
     sprite.setData('fitMax', AUTOSCALE.rootabreak ?? FIT_MAX);
     sprite.setOrigin(0.5, 0.9); // grounded origin
     if (big) sprite.setTint(0xffab91); // big one: slightly red tint
     this.placeFighter(sprite, col, row, MANDRAKE_MANUAL * (big ? 1.35 : 1));
+    // compensate for (0.5, 0.9): placeFighter assumes (0.5, 1), so shift up
+    // by 10% of height to keep the bottom at the feet line
+    sprite.y -= 0.1 * sprite.displayHeight;
     // store the home position for the leap (sprite returns here)
     const homeY = sprite.y;
     const maxHp = big ? M.maxHp * 2 : M.maxHp;
@@ -1236,7 +1241,7 @@ export default class BattleScene extends Phaser.Scene {
       this.placeFighter(e.sprite, e.col, e.row, manual);
       if (e.type === 'rootabreak') {
         const mp = tileFeet(e.col, e.row);
-        e.sprout.setPosition(mp.x, mp.y - 8).setScale(mp.s * 0.9).setDepth(9 + e.row);
+        e.sprout.setPosition(mp.x, mp.y).setScale(mp.s * 0.9).setDepth(9 + e.row);
       }
     }
   }
@@ -1816,6 +1821,8 @@ export default class BattleScene extends Phaser.Scene {
     md.sprite.setVisible(true);
     const manual = MANDRAKE_MANUAL * (md.big ? 1.35 : 1);
     this.placeFighter(md.sprite, md.col, md.row, manual);
+    // compensate for (0.5, 0.9) ground origin first
+    md.sprite.y -= 0.1 * md.sprite.displayHeight;
     // switch origin to center for the air; compensate y so it doesn't shift
     const dh = md.sprite.displayHeight;
     md.sprite.setOrigin(0.5, 0.5);
