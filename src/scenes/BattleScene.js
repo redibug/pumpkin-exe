@@ -662,14 +662,6 @@ export default class BattleScene extends Phaser.Scene {
         const newHl = this.highlightTile(curCol, brow, color, 0.25);
         b.setData('tileHighlight', newHl);
         b.setData('hlCol', curCol);
-        // clean up when the wave dies
-        if (!b.getData('hlHooked')) {
-          b.setData('hlHooked', true);
-          b.on('destroy', () => {
-            const h = b.getData('tileHighlight');
-            if (h && h.active) h.destroy();
-          });
-        }
       }
       // sound waves expand as they travel (tracing a larger circle)
       // baseScale preserves the perspective scale
