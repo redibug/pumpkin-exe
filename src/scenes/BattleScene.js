@@ -614,7 +614,7 @@ export default class BattleScene extends Phaser.Scene {
     if (this.battleIndex + 1 >= BATTLES.length) return;
     // close any open UI/dialogue so the restart is clean
     if (this.customOpen) this.closeCustomUI();
-    this.scene.restart({ battleIndex: this.battleIndex + 1 });
+    this.scene.restart({ battleIndex: this.battleIndex + 1, naviHp: this.naviHp });
   }
 
   // ================= custom screen =================
