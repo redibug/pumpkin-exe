@@ -219,6 +219,7 @@ export const RootabreakMethods = {
     g.setData('damage', ROOTABREAK.screamDamage);
     g.setData('expand', 0); // tracks expansion for the update loop
     g.setData('baseScale', ps); // perspective scale (expansion multiplies this)
+    // tile indicator is managed in updateEnemyProjectiles (follows the wave)
     this.enemyProjectiles.add(g);
   }
 };
