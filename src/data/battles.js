@@ -112,7 +112,6 @@ export const BATTLES = [
     intro: [
       { speaker: 'mel', text: 'A nest. Roots on the edges, spider in the middle with bombs.' },
       { speaker: 'bugchan', text: 'Messy nest! I will clean it up!' },
-      { speaker: 'rootabreak', text: 'KYAAAH!!' },
     ],
     victory: [
       { speaker: 'bugchan', text: 'Nest cleared! No more ticking!' },
@@ -120,7 +119,6 @@ export const BATTLES = [
     story: [
       { speaker: 'mel', text: 'One signal left. It is huge. Be careful, Bugchan.' },
       { speaker: 'bugchan', text: 'Huge? Like... pumpkin huge?' },
-      { speaker: 'pumpkin', text: 'I AM PUMPKIN.EXE! THIS HARVEST IS MINE, LITTLE BUG!' },
     ],
   },
   {
@@ -129,7 +127,7 @@ export const BATTLES = [
       { type: 'pumpkin', col: 4, row: 1 },
     ],
     intro: [
-      { speaker: 'mel', text: 'Bugchan, I jacked you into the cyberworld. Something is wrong in there...' },
+      //{ speaker: 'mel', text: 'Bugchan, I jacked you into the cyberworld. Something is wrong in there...' },
       { speaker: 'bugchan', text: 'Whoa! Pumpkins everywhere! And they look mad!' },
       { speaker: 'pumpkin', text: 'I AM PUMPKIN.EXE! THIS HARVEST IS MINE, LITTLE BUG!' },
       { speaker: 'bugchan', text: 'Not on my watch! Mel, send chips! I will debug this gourd!' },
