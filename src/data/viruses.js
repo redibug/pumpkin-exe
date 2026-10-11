@@ -35,7 +35,7 @@ export const BOMB_SPIDER = {
 export const ROOTABREAK = {
   id: 'rootabreak',
   name: 'ROOTABREAK',
-  maxHp: 120,
+  maxHp: 60,
   // State machine: PLANTED -> LEAPING -> SCREAMING -> FALLING -> PLANTED
   // Stationary; invincible while planted. Jump timing synced by column.
   plantedMs: 3500,    // invulnerable, shown as a sprout
