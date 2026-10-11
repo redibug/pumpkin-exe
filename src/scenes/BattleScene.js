@@ -1848,11 +1848,11 @@ export default class BattleScene extends Phaser.Scene {
           stroke: '#2a0a2a', strokeThickness: 4,
         }).setOrigin(0.5).setDepth(10 + md.row);
         // float up slowly and fade out (longer-lived)
-        // shake: intense at first, calming down (decaying amplitude)
+        // shake: intense at first, still by half duration (decaying amplitude)
         const baseX = sx;
         const shake = { t: 0 };
         this.tweens.add({
-          targets: shake, t: 1, duration: 1800*2, ease: 'Linear',
+          targets: shake, t: 1, duration: 1800, ease: 'Linear',
           onUpdate: () => {
             if (!md.screamText || !md.screamText.active) return;
             const amp = (1 - shake.t) * 10; // 10px -> 0
