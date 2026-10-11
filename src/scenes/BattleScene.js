@@ -64,6 +64,7 @@ export default class BattleScene extends Phaser.Scene {
     this.load.image('bomb-spider', 'assets/sprites/viruses/bomb spider.png');
     this.load.spritesheet('bomb', 'assets/sprites/viruses/bomb.png', { frameWidth: 64, frameHeight: 64 });
     this.load.spritesheet('bug-bomb', 'assets/sprites/bug/bomb.png', { frameWidth: 64, frameHeight: 64 });
+    this.load.spritesheet('explosion', 'assets/sprites/explosion-strip.png', { frameWidth: 256, frameHeight: 256 });
     this.load.image('bg', 'assets/tiles/bg-cyberspace.png');
     this.load.image('chip-cannon', 'assets/ui/chip-cannon.png');
     this.load.image('chip-sword', 'assets/ui/chip-sword.png');

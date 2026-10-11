@@ -188,5 +188,28 @@ export const EffectsMethods = {
       onComplete: () => { if (target.active) target.clearTint(); },
     });
     tw._noPause = true;
+  },
+  playExplosion(x, y, scale = 1, depth = 20) {
+    // Sprite-sheet explosion: 8 frames, additive blend for glow.
+    const spr = this.add.sprite(x, y, 'explosion', 0);
+    spr.setDepth(depth);
+    spr.setScale(scale);
+    spr.setBlendMode(Phaser.BlendModes.ADD);
+    // Step through frames manually for precise timing
+    const frameTime = 50; // ms per frame = 400ms total
+    let frame = 0;
+    const timer = this.time.addEvent({
+      delay: frameTime, repeat: 7,
+      callback: () => {
+        frame++;
+        if (frame < 8 && spr.active) {
+          spr.setFrame(frame);
+        } else {
+          timer.remove();
+          if (spr.active) spr.destroy();
+        }
+      },
+    });
+    return spr;
   }
 };

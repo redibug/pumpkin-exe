@@ -246,14 +246,9 @@ export const NaviMethods = {
         onComplete: () => {
           bomb.destroy();
           warns.forEach((w) => w.destroy());
-          // explosion flash
+          // explosion sprite
           const c = tileCenter(targetCol, targetRow);
-          const boom = this.add.circle(c.x, c.y, 10, 0xff6f00).setDepth(20);
-          this.tweens.add({
-            targets: boom, scaleX: 4, scaleY: 2.5, alpha: 0,
-            duration: 280, ease: 'Quad.easeOut',
-            onComplete: () => boom.destroy(),
-          });
+          this.playExplosion(c.x, c.y, 0.6);
           // damage enemies on the landing tile + orthogonal adjacent
           for (const e of this.enemies) {
             if (!e.alive) continue;

@@ -151,14 +151,9 @@ export const BombSpiderMethods = {
       e.bombWarns.forEach((w) => w.destroy());
       e.bombWarns = null;
     }
-    // explosion flash on the landing tile
+    // explosion sprite on the landing tile
     const c = tileCenter(col, row);
-    const boom = this.add.circle(c.x, c.y, 10, 0xff6f00).setDepth(20);
-    this.tweens.add({
-      targets: boom, scaleX: 4, scaleY: 2.5, alpha: 0,
-      duration: 280, ease: 'Quad.easeOut',
-      onComplete: () => boom.destroy(),
-    });
+    this.playExplosion(c.x, c.y, 0.6);
     // damage: landing tile + orthogonal adjacent (plus-shape, no diagonals)
     const nc = this.naviPos.col, nr = this.naviPos.row;
     const manhattan = Math.abs(nc - col) + Math.abs(nr - row);
