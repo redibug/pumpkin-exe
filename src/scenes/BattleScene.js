@@ -1345,6 +1345,8 @@ export default class BattleScene extends Phaser.Scene {
   // ================= main loop =================
 
   update(time, delta) {
+    // visual follows run even when paused (don't affect game timing)
+    this.syncBombBacks();
     // dialogue owns the frame while a script plays: the game is paused
     if (this.dialogue.isActive()) {
       this.dialogue.update(delta);
@@ -1870,12 +1872,17 @@ export default class BattleScene extends Phaser.Scene {
     }
   }
 
-  bombSpiderAI(e, time) {
-    // keep the back-bomb synced: follows the sprite, hides when teleporting
-    if (e.bombBack) {
+  // Keep back-bombs synced to their spiders (position + squash).
+  // Runs every frame, even when paused — it's a visual follow, not game timing.
+  syncBombBacks() {
+    for (const e of this.enemies) {
+      if (e.type !== 'bombspider' || !e.bombBack || !e.alive) continue;
       e.bombBack.setVisible(e.hasBomb && e.sprite.visible);
       if (e.hasBomb && e.sprite.visible) this.positionBombBack(e);
     }
+  }
+
+  bombSpiderAI(e, time) {
     // Cycle: move -> move -> throw -> repeat
     if (time >= e.nextMove) {
       e.nextMove = time + BOMB_SPIDER.moveIntervalMs;
