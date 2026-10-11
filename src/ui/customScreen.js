@@ -2,6 +2,7 @@
 // Mixed into BattleScene via Object.assign, so `this` is the scene.
 import Phaser from 'phaser';
 import { CHIP_MAP } from '../data/chips.js';
+import { BOMB_SPIDER } from '../data/viruses.js';
 import { sound } from '../systems/sound.js';
 
 export const CUSTOM_GAUGE_MS = 10000; // battle time to fill the custom gauge
@@ -175,12 +176,13 @@ export const CustomScreenMethods = {
     JD(this.shootKey); JD(this.chipFrontKey); JD(this.chipFrontKey2); JD(this.enterKey);
     Object.values(this.keys).forEach(JD);
     this.setPaused(false);
-    // Grace period: bomb spiders restart their move cycle after the custom
-    // screen (don't throw immediately)
+    // After the custom screen: bomb spiders restart their move cycle,
+    // but the throw grace period still applies (don't throw immediately)
     for (const e of this.enemies) {
       if (e.type === 'bombspider' && e.alive) {
         e.movesDone = 0;
-        e.nextMove = this.time.now + 2000;
+        e.nextMove = this.time.now; // move immediately, no delay
+        e.throwAllowedAt = Math.max(e.throwAllowedAt, this.time.now + BOMB_SPIDER.throwGraceMs);
       }
     }
   },
