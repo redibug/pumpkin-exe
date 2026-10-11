@@ -491,7 +491,7 @@ export default class BattleScene extends Phaser.Scene {
       type: 'bombspider', sprite, bombBack, col, row,
       hp: BOMB_SPIDER.maxHp, maxHp: BOMB_SPIDER.maxHp, alive: true,
       nextMove: 0,
-      nextThrow: 0,
+      nextThrow: -1, // init on first AI run (don't throw immediately)
       hasBomb: true, // false while the thrown bomb is in the air / reloading
       hpBar: this.makeHpBar(),
     };
@@ -501,12 +501,14 @@ export default class BattleScene extends Phaser.Scene {
 
   // Position the back-bomb at the spider's abdomen, layered behind.
   // Offset up and to the right so it peeks out from behind the body.
+  // Scale follows the spider's perspective scale.
   positionBombBack(e) {
     const s = e.sprite;
     e.bombBack.setPosition(
       s.x + s.displayWidth * 0.28,
       s.y - s.displayHeight * 0.72
     );
+    e.bombBack.setScale(s.scaleX * 0.9); // perspective-matched
     e.bombBack.setDepth(s.depth - 0.5); // behind the spider
   }
 
@@ -773,6 +775,14 @@ export default class BattleScene extends Phaser.Scene {
     JD(this.shootKey); JD(this.chipFrontKey); JD(this.chipFrontKey2); JD(this.enterKey);
     Object.values(this.keys).forEach(JD);
     this.setPaused(false);
+    // Grace period: bomb spiders hold their throw briefly after the custom
+    // screen closes (don't punish the player immediately)
+    const now = this.time.now;
+    for (const e of this.enemies) {
+      if (e.type === 'bombspider' && e.alive && e.nextThrow > 0) {
+        e.nextThrow = Math.max(e.nextThrow, now + 2000);
+      }
+    }
   }
 
   // ================= custom screen (redesigned) =================
@@ -1846,21 +1856,23 @@ export default class BattleScene extends Phaser.Scene {
       e.bombBack.setVisible(e.hasBomb && e.sprite.visible);
       if (e.hasBomb && e.sprite.visible) this.positionBombBack(e);
     }
-    // Walk: random direction every few seconds (teleport, like skitterbug)
+    // init throw timer on first run (don't throw immediately)
+    if (e.nextThrow < 0) e.nextThrow = time + BOMB_SPIDER.throwIntervalMs;
+    // Walk: try all 4 directions in random order until one works
     if (time >= e.nextMove) {
       e.nextMove = time + BOMB_SPIDER.moveIntervalMs;
-      // random neighboring tile in enemy columns (3-5), any row
-      const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
-      const [dc, dr] = dirs[(Math.random() * dirs.length) | 0];
-      const nc = Phaser.Math.Clamp(e.col + dc, 3, 5);
-      const nr = Phaser.Math.Clamp(e.row + dr, 0, ROWS - 1);
-      if (nc !== e.col || nr !== e.row) {
-        e.col = nc; e.row = nr;
-        this.teleportMove(e.sprite, e.col, e.row, BOMB_SPIDER_MANUAL, () => {
+      const dirs = Phaser.Utils.Array.Shuffle([[-1, 0], [1, 0], [0, -1], [0, 1]]);
+      for (const [dc, dr] of dirs) {
+        const nc = Phaser.Math.Clamp(e.col + dc, 3, 5);
+        const nr = Phaser.Math.Clamp(e.row + dr, 0, ROWS - 1);
+        if (nc !== e.col || nr !== e.row) {
+          e.col = nc; e.row = nr;
+          this.teleportMove(e.sprite, e.col, e.row, BOMB_SPIDER_MANUAL, () => {
+            this.positionBombBack(e);
+          });
           this.positionBombBack(e);
-        });
-        // move the back-bomb immediately too (it follows the sprite)
-        this.positionBombBack(e);
+          break;
+        }
       }
     }
     // Throw: at regular intervals, if carrying the bomb
@@ -1908,9 +1920,10 @@ export default class BattleScene extends Phaser.Scene {
       duration: 280, ease: 'Quad.easeOut',
       onComplete: () => boom.destroy(),
     });
-    // damage: landing tile + all adjacent (3x3)
+    // damage: landing tile + orthogonal adjacent (plus-shape, no diagonals)
     const nc = this.naviPos.col, nr = this.naviPos.row;
-    if (Math.abs(nc - col) <= 1 && Math.abs(nr - row) <= 1) {
+    const manhattan = Math.abs(nc - col) + Math.abs(nr - row);
+    if (manhattan <= 1) {
       this.damageNavi(BOMB_SPIDER.bombDamage);
       this.flash(this.navi, 0xff6f00);
     }
