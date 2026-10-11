@@ -296,7 +296,7 @@ export default class BattleScene extends Phaser.Scene {
     } else {
       const pausedMs = this.time.now - (this.pauseStart || this.time.now);
       for (const e of this.enemies) {
-        for (const key of ['nextMove', 'nextAttack', 'nextCheck', 'timer']) {
+        for (const key of ['nextMove', 'nextAttack', 'nextCheck', 'timer', 'throwAllowedAt']) {
           if (Number.isFinite(e[key])) e[key] += pausedMs;
         }
       }

@@ -80,11 +80,11 @@ export const BombSpiderMethods = {
     // Cycle: move -> move -> throw -> repeat
     if (time >= e.nextMove) {
       e.nextMove = time + BOMB_SPIDER.moveIntervalMs;
-      if (e.movesDone >= BOMB_SPIDER.movesBeforeThrow && time >= e.throwAllowedAt) {
-        // time to throw (if carrying the bomb)
-        if (e.hasBomb) {
-          this.throwBomb(e);
-        }
+      const readyToThrow = e.movesDone >= BOMB_SPIDER.movesBeforeThrow
+        && time >= e.throwAllowedAt
+        && e.hasBomb;
+      if (readyToThrow) {
+        this.throwBomb(e);
         e.movesDone = 0;
       } else {
         // do a move: try all 4 directions in random order
