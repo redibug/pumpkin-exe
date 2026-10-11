@@ -83,7 +83,7 @@ export default class TitleScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // Press start (blinking)
-    const start = this.add.text(cx, height / 2 + 80, '[ CLICK FOR MUSIC · PRESS ENTER TO LOG IN ]', {
+    const start = this.add.text(cx, height / 2 + 80, '[ PRESS ENTER TO LOG IN ]', {
       fontFamily: 'monospace', fontSize: '22px', color: '#e8f6ff',
     }).setOrigin(0.5);
     this.tweens.add({ targets: start, alpha: 0.2, duration: 600, yoyo: true, repeat: -1 });

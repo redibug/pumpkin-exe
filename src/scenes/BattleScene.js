@@ -90,10 +90,6 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   create() {
-    // stop BGM when leaving/restarting the scene
-    this.events.once('shutdown', () => {
-      if (this._bgm) { this._bgm.stop(); this._bgm.destroy(); this._bgm = null; }
-    });
     this.over = false;
     this.time.paused = false; // insurance: never boot a restart mid-pause
 
@@ -107,11 +103,19 @@ export default class BattleScene extends Phaser.Scene {
       if (this._bgm) this._bgm.setMute(!on);
     });
     sound.battleStart();
-    // background music: boss theme for PUMPKIN.EXE, battle theme otherwise
+    // background music: boss theme for PUMPKIN.EXE, battle theme otherwise.
+    // Persisted on the game object so it keeps looping across battles
+    // instead of restarting (only switches when the track changes).
     const isBoss = BATTLES[this.battleIndex]?.name === 'PUMPKIN.EXE';
-    this._bgm = this.sound.add(isBoss ? 'mus-boss' : 'mus-battle', { loop: true, volume: 0.35 });
-    this._bgm.setMute(!sound.enabled);
-    // start after first gesture (autoplay policy); SFX init already handles unlock
+    const wantKey = isBoss ? 'mus-boss' : 'mus-battle';
+    if (!this.game._bgm || this.game._bgmKey !== wantKey) {
+      // stop old track if switching
+      if (this.game._bgm) { this.game._bgm.stop(); this.game._bgm.destroy(); }
+      this.game._bgm = this.sound.add(wantKey, { loop: true, volume: 0.35 });
+      this.game._bgmKey = wantKey;
+      this.game._bgm.setMute(!sound.enabled);
+    }
+    this._bgm = this.game._bgm; // alias for the M-key handler
     const playBgm = () => { if (!this._bgm.isPlaying) this._bgm.play(); };
     this.input.once('pointerdown', playBgm);
     this.input.keyboard.once('keydown', playBgm);
