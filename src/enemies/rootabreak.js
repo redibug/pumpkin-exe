@@ -111,7 +111,7 @@ export const RootabreakMethods = {
         md.screamText = this.add.text(sx, textY, 'KYAAAH!!', {
           fontFamily: 'monospace', fontSize: '22px', color: '#ce93d8',
           stroke: '#2a0a2a', strokeThickness: 4,
-        }).setOrigin(0.5).setDepth(10 + md.row);
+        }).setOrigin(0.5).setDepth(31); // above the HP number (depth 30)
         // float up slowly and fade out (longer-lived)
         // shake: intense at first, still by half duration (decaying amplitude)
         const baseX = sx;
@@ -206,11 +206,11 @@ export const RootabreakMethods = {
     // perspective: match the sprite's scale (going forward, all projectiles
     // should inherit perspective from their source)
     const ps = md.sprite.scaleX;
-    // spawn half a tile out in the travel direction, at mouth height
+    // spawn a quarter tile out in the travel direction, at mouth height
     const corners = tileCorners(md.col, md.row);
     const tileW = Math.max(...corners.map((p) => p.x)) - Math.min(...corners.map((p) => p.x));
     g.setPosition(
-      md.sprite.x + dir * tileW * 0.5,
+      md.sprite.x + dir * tileW * 0.25,
       md.sprite.y - 0.5 * md.sprite.displayHeight
     );
     g.setScale(ps);
