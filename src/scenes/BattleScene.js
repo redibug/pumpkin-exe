@@ -109,7 +109,6 @@ export default class BattleScene extends Phaser.Scene {
     this.enemyProjectiles = this.add.group(); // virus bullets (hurt the navi)
     this.shootReadyAt = 0; // buster hitscan fire rate gate
     this.enemies = []; // {type, sprite, col, row, hp, maxHp, alive, ...}
-    this.mandrakeGagged = false; // first-emerge gag plays once per battle
 
     // ---- custom screen / deck state ----
     this.deck = Phaser.Utils.Array.Shuffle([...DECK]);

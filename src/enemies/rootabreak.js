@@ -139,10 +139,6 @@ export const RootabreakMethods = {
         });
         this.spawnNoiseWave(md, -1); // left
         this.spawnNoiseWave(md, 1);  // right
-        if (!this.mandrakeGagged) {
-          this.mandrakeGagged = true;
-          this.startDialogue(SCRIPTS.mandrakeGag);
-        }
         // hang at peak briefly, then fall
         this.time.delayedCall(350, () => {
           if (!md.alive) return;
