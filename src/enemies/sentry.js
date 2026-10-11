@@ -92,10 +92,7 @@ export const SentryMethods = {
     // Origin is (0.75, 1).
     const mx = s.x + (0.0 - 0.75) * s.displayWidth;
     const my = s.y + (0.3390 - 1.0) * s.displayHeight;
-    const beam = this.add.line(0, 0, 30, my, mx, my, 0xff3b30).setOrigin(0, 0);
-    beam.setLineWidth(6).setAlpha(0.95);
-    beam.setDepth(10 + e.row);
-    this.tweens.add({ targets: beam, alpha: 0, duration: 160, onComplete: () => beam.destroy() });
+    this.fireBeam(30, my, mx, my, 0xff3b30, 6, 160, 10 + e.row);
 
     // hitscan: if the navi is on the row when it fires, she takes the hit
     if (this.naviPos.row === e.row) {

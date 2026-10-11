@@ -194,6 +194,51 @@ export const EffectsMethods = {
     });
     tw._noPause = true;
   },
+  // Polished beam: wide translucent glow + narrow bright core. Fades out.
+  // x1,y1 to x2,y2 in world coords. Returns the container (auto-destroyed).
+  fireBeam(x1, y1, x2, y2, color, width = 5, duration = 140, depth = 15) {
+    const cont = this.add.container(0, 0).setDepth(depth);
+    // glow (wide, translucent)
+    const glow = this.add.line(0, 0, x1, y1, x2, y2, color).setOrigin(0, 0);
+    glow.setLineWidth(width * 2.5).setAlpha(0.3);
+    // core (narrow, bright)
+    const core = this.add.line(0, 0, x1, y1, x2, y2, 0xffffff).setOrigin(0, 0);
+    core.setLineWidth(width * 0.6).setAlpha(0.95);
+    // colored mid layer
+    const mid = this.add.line(0, 0, x1, y1, x2, y2, color).setOrigin(0, 0);
+    mid.setLineWidth(width).setAlpha(0.9);
+    cont.add([glow, mid, core]);
+    this.tweens.add({
+      targets: cont, alpha: 0, duration,
+      onComplete: () => { if (cont.active) cont.destroy(); },
+    });
+    return cont;
+  },
+  // Polished glowing bullet: elongated in travel direction with bright core.
+  // Returns a container with the visuals; position the container to move it.
+  makeGlowBullet(color, size = 10) {
+    const cont = this.add.container(0, 0);
+    // outer glow (translucent, stretched)
+    const glow = this.add.ellipse(0, 0, size * 2.4, size * 1.4, color, 0.35);
+    // main body (stretched oval)
+    const body = this.add.ellipse(0, 0, size * 2, size * 1.1, color, 0.95);
+    // hot core (bright white-yellow)
+    const core = this.add.ellipse(2, 0, size * 0.9, size * 0.5, 0xffffff, 0.95);
+    cont.add([glow, body, core]);
+    return cont;
+  },
+  // Polished ichor blob: gooey circle with shine spot.
+  makeIchorBlob(color, size = 8) {
+    const cont = this.add.container(0, 0);
+    // outer glow
+    const glow = this.add.circle(0, 0, size * 1.6, color, 0.3);
+    // main blob
+    const blob = this.add.circle(0, 0, size, color, 0.95);
+    // shine (offset up-left)
+    const shine = this.add.circle(-size * 0.3, -size * 0.3, size * 0.35, 0xffffff, 0.7);
+    cont.add([glow, blob, shine]);
+    return cont;
+  },
   playSwordSlash(x, y, color = 0x4fc3f7, scale = 1) {
     // Crescent slash arc: draws in fast, fades out. Additive for glow.
     const g = this.add.graphics();

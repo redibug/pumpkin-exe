@@ -90,10 +90,7 @@ export const NaviMethods = {
       }
     }
     const endX = target ? tileCenter(targetCol, row).x : 930;
-    const beam = this.add.line(0, 0, mx, my, endX, my, chip.color).setOrigin(0, 0);
-    beam.setLineWidth(2).setAlpha(0.8);
-    beam.setDepth(10 + row);
-    this.tweens.add({ targets: beam, alpha: 0, duration: 90, onComplete: () => beam.destroy() });
+    this.fireBeam(mx, my, endX, my, chip.color, 4, 120, 10 + row);
     if (target) { this.damageEnemy(target, chip.damage); this.flash(target.sprite, chip.color); }
 
     this.chipAmmo[slot]--;
@@ -155,10 +152,7 @@ export const NaviMethods = {
     const endX = target ? tileCenter(targetCol, row).x : 930;
     // NB: Line geometry renders minus the display origin, so setOrigin(0, 0)
     // or the beam centers on the wrong point.
-    const beam = this.add.line(0, 0, mx, my, endX, my, 0xfff176).setOrigin(0, 0);
-    beam.setLineWidth(3).setAlpha(0.9);
-    beam.setDepth(10 + row); // row-ordered like the other battle effects
-    this.tweens.add({ targets: beam, alpha: 0, duration: 110, onComplete: () => beam.destroy() });
+    this.fireBeam(mx, my, endX, my, 0xfff176, 3, 110, 10 + row);
     if (target) { this.damageEnemy(target, 5); this.flash(target.sprite, 0xfff176); }
   },
   showPunchFrame() {
@@ -284,10 +278,7 @@ export const NaviMethods = {
       const s = this.navi.scaleX;
       const mx = this.navi.x + 45 * s, my = this.navi.y - 115 * s;
       // beam across the full row
-      const beam = this.add.line(0, 0, mx, my, 930, my, 0x00e5ff).setOrigin(0, 0);
-      beam.setLineWidth(5).setAlpha(0.95);
-      beam.setDepth(10 + row);
-      this.tweens.add({ targets: beam, alpha: 0, duration: 140, onComplete: () => beam.destroy() });
+      this.fireBeam(mx, my, 930, my, 0x00e5ff, 6, 160, 10 + row);
       // damage every hittable enemy ahead on the row (pierce, no early stop)
       for (const e of this.enemies) {
         if (!e.alive) continue;
@@ -310,7 +301,8 @@ export const NaviMethods = {
       // Spread: the center bullet fires from in front; the side bullets
       // come from Bugchan's side (her x) on the rows above/below.
       const startX = (chip.id === 'spread' && r !== this.naviPos.row) ? feet.x : feet.x + 30;
-      const proj = this.add.circle(startX, tileCenter(0, r).y, 10, chip.color);
+      const proj = this.makeGlowBullet(chip.color, 10);
+      proj.setPosition(startX, tileCenter(0, r).y);
       proj.setDepth(10 + r); // row-ordered like other effects
       proj.setData('damage', chip.damage);
       proj.setData('row', r);

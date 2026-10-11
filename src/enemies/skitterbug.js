@@ -113,7 +113,8 @@ export const SkitterbugMethods = {
   },
   spawnIchorBullet(e) {
     const p = tileCenter(e.col, e.row);
-    const bullet = this.add.circle(p.x - 20, p.y, 8, SKITTER.bulletColor);
+    const bullet = this.makeIchorBlob(SKITTER.bulletColor, 8);
+      bullet.setPosition(p.x - 20, p.y);
     bullet.setDepth(10 + e.row);
     // perspective: inherit from the shooter (going forward, all projectiles do this)
     const ps = e.sprite.scaleX;
