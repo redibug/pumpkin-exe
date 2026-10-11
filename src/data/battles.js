@@ -68,7 +68,9 @@ export const BATTLES = [
     ],
     intro: [
       { speaker: 'mel', text: 'Two rootabreak viruses. They hide underground, then jump out screaming.' },
-      { speaker: 'bugchan', text: 'Smells like dirt! I will debug these roots!' },
+      { speaker: 'bugchan', text: 'Are these turnips?' },
+      { speaker: 'mel', text: 'Actually, I think they are rutabagas.' },
+      { speaker: 'bugchan', text: 'Rutabagas?! I will debug these roots!' },
       { speaker: 'rootabreak', text: 'KYAAAH!!' },
     ],
     victory: [
