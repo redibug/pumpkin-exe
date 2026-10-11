@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { COLS, ROWS, project, tileCorners, tileFeet, tileCenter, isPlayerTile, gridParams, setGridParams, getGridParams, hexToRgb } from '../systems/grid.js';
 import { CHIP_MAP, DECK, BOSS } from '../systems/chips.js';
-import { RUTABAGA_MANDRAKE } from '../systems/viruses.js';
+import { ROOTABREAK } from '../systems/viruses.js';
 import { fitFactor, FIT_MAX } from '../systems/spriteFit.js';
 import { createDebugGameplay, isDialogueSkipped } from '../systems/debugGameplay.js';
 import { createDebugOverlay } from '../systems/debugOverlay.js';
@@ -10,7 +10,7 @@ import { DialogueUI, SCRIPTS } from '../systems/dialogue.js';
 // BattleScene — written during the jam 72h window (2026-10-09).
 // MMBN-style grid battle: Bugchan (navi) vs PUMPKIN.EXE + RUTABAGA.MND.
 
-const M = RUTABAGA_MANDRAKE;
+const M = ROOTABREAK;
 
 // Skitterbug tuning (Mel: edit freely)
 const SKITTER = {
@@ -109,13 +109,13 @@ const BATTLES = [
   {
     name: 'SPROUT PATROL',
     enemies: [
-      { type: 'mandrake', col: 4, row: 0 },
-      { type: 'mandrake', col: 4, row: 2 },
+      { type: 'rootabreak', col: 4, row: 0 },
+      { type: 'rootabreak', col: 4, row: 2 },
     ],
     intro: [
-      { speaker: 'mel', text: 'Bugchan, I jacked you in. Two rutabaga viruses are digging around in there.' },
+      { speaker: 'mel', text: 'Bugchan, I jacked you in. Two rootabreak viruses are digging around in there.' },
       { speaker: 'bugchan', text: 'Smells like dirt! I will debug these roots!' },
-      { speaker: 'mandrake', text: 'KYAAAH!!' },
+      { speaker: 'rootabreak', text: 'KYAAAH!!' },
     ],
     victory: [
       { speaker: 'bugchan', text: 'Two down! That was easy!' },
@@ -128,14 +128,14 @@ const BATTLES = [
   {
     name: 'ROOT CELLAR',
     enemies: [
-      { type: 'mandrake', col: 3, row: 0 },
-      { type: 'mandrake', col: 5, row: 1, big: true },
-      { type: 'mandrake', col: 3, row: 2 },
+      { type: 'rootabreak', col: 3, row: 0 },
+      { type: 'rootabreak', col: 5, row: 1, big: true },
+      { type: 'rootabreak', col: 3, row: 2 },
     ],
     intro: [
       { speaker: 'mel', text: 'Three this time. The big one in the middle looks mean.' },
       { speaker: 'bugchan', text: 'Big root, big problems! Chips ready, Mel!' },
-      { speaker: 'mandrake', text: 'KYAAAH!!' },
+      { speaker: 'rootabreak', text: 'KYAAAH!!' },
     ],
     victory: [
       { speaker: 'bugchan', text: 'Phew! The big one almost got me!' },
@@ -150,7 +150,7 @@ const BATTLES = [
     name: 'PUMPKIN.EXE',
     enemies: [
       { type: 'pumpkin', col: 4, row: 1 },
-      { type: 'mandrake', col: 5, row: 0 },
+      { type: 'rootabreak', col: 5, row: 0 },
     ],
     intro: [
       { speaker: 'mel', text: 'Bugchan, I jacked you into the cyberworld. Something is wrong in there...' },
@@ -203,7 +203,8 @@ export default class BattleScene extends Phaser.Scene {
     this.load.image('tile-enemy', 'assets/tiles/tile-enemy.png');
     this.load.spritesheet('bugchan', 'assets/sprites/bug/bugchan-idle-strip.png', { frameWidth: 112, frameHeight: 224 });
     this.load.image('boss', 'assets/sprites/viruses/boss-v5-cloak.png');
-    this.load.image('mandrake', 'assets/sprites/viruses/rootabreak.png');
+    this.load.image('rootabreak', 'assets/sprites/viruses/rootabreak.png');
+    this.load.image('rootabreak-sprout', 'assets/sprites/viruses/rootabreak sprout.png');
     this.load.image('skitterbug', 'assets/sprites/viruses/virus-skitterbug.png');
     this.load.image('sentry', 'assets/sprites/viruses/virus-sentry-clean.png');
     this.load.image('bomb-spider', 'assets/sprites/viruses/bomb spider.png');
@@ -300,7 +301,7 @@ export default class BattleScene extends Phaser.Scene {
     const battle = BATTLES[this.battleIndex];
     for (const e of battle.enemies) {
       if (e.type === 'pumpkin') this.spawnPumpkin(e.col, e.row);
-      else if (e.type === 'mandrake') this.spawnMandrake(e.col, e.row, e.big);
+      else if (e.type === 'rootabreak') this.spawnRootabreak(e.col, e.row, e.big);
       else if (e.type === 'skitterbug') this.spawnSkitterbug(e.col, e.row);
       else if (e.type === 'sentry') this.spawnSentry(e.col, e.row);
       else if (e.type === 'bombspider') this.spawnBombSpider(e.col, e.row);
@@ -361,7 +362,7 @@ export default class BattleScene extends Phaser.Scene {
         if (e.type === 'pumpkin') {
           e.nextMove = now + 1400;
           e.nextAttack = now + 2200;
-        } else if (e.type === 'mandrake') {
+        } else if (e.type === 'rootabreak') {
           e.timer = now + M.burrowedMs;
         } else if (e.type === 'skitterbug') {
           e.nextCheck = now + 1500;
@@ -389,22 +390,25 @@ export default class BattleScene extends Phaser.Scene {
     return enemy;
   }
 
-  spawnMandrake(col, row, big = false) {
+  spawnRootabreak(col, row, big = false) {
     const mp = tileFeet(col, row);
-    // dirt mound (burrowed) + hidden sprite
-    const mound = this.add.ellipse(mp.x, mp.y - 8, 70, 26, 0x5d3a1a);
-    mound.setScale(mp.s).setDepth(9 + row);
-    const sprite = this.physics.add.sprite(mp.x, mp.y, 'mandrake').setVisible(false);
-    sprite.setData('fitMax', AUTOSCALE.mandrake ?? FIT_MAX);
+    // planted: sprout visible, main sprite hidden
+    const sprout = this.add.image(mp.x, mp.y - 8, 'rootabreak-sprout');
+    sprout.setScale(mp.s * 0.9).setDepth(9 + row);
+    const sprite = this.physics.add.sprite(mp.x, mp.y, 'rootabreak').setVisible(false);
+    sprite.setData('fitMax', AUTOSCALE.rootabreak ?? FIT_MAX);
     sprite.setOrigin(0.5, 1);
     if (big) sprite.setTint(0xffab91); // big one: slightly red tint
     this.placeFighter(sprite, col, row, MANDRAKE_MANUAL * (big ? 1.35 : 1));
+    // store the home position for the leap (sprite returns here)
+    const homeY = sprite.y;
     const maxHp = big ? M.maxHp * 2 : M.maxHp;
     const enemy = {
-      type: 'mandrake', sprite, mound, col, row,
+      type: 'rootabreak', sprite, sprout, col, row, homeY,
       hp: maxHp, maxHp, alive: true, big,
-      state: 'burrowed', // burrowed | telegraph | emerged
-      timer: 0, warnRect: null,
+      state: 'planted', // planted | leaping | screaming | falling
+      nextJump: -1, // init on first AI tick (column-synced)
+      screamText: null,
       hpBar: this.makeHpBar(),
     };
     this.enemies.push(enemy);
@@ -558,7 +562,7 @@ export default class BattleScene extends Phaser.Scene {
   updateHpBar(enemy) {
     const t = enemy.hpBar;
     // only show for hittable enemies (mandrakes hide while burrowed)
-    const show = enemy.alive && (enemy.type !== 'mandrake' || enemy.state === 'emerged');
+    const show = enemy.alive && (enemy.type !== 'rootabreak' || enemy.state !== 'planted');
     t.setVisible(show);
     if (!show) return;
     const s = enemy.sprite;
@@ -1228,11 +1232,11 @@ export default class BattleScene extends Phaser.Scene {
     this.placeFighter(this.navi, this.naviPos.col, this.naviPos.row, NAVI_MANUAL);
     for (const e of this.enemies) {
       const manual = e.type === 'pumpkin' ? BOSS_MANUAL : MANDRAKE_MANUAL * (e.big ? 1.35 : 1);
-      if (e.type === 'mandrake' && !e.sprite.visible) continue;
+      if (e.type === 'rootabreak' && !e.sprite.visible) continue;
       this.placeFighter(e.sprite, e.col, e.row, manual);
-      if (e.type === 'mandrake') {
+      if (e.type === 'rootabreak') {
         const mp = tileFeet(e.col, e.row);
-        e.mound.setPosition(mp.x, mp.y - 8).setScale(mp.s).setDepth(9 + e.row);
+        e.sprout.setPosition(mp.x, mp.y - 8).setScale(mp.s * 0.9).setDepth(9 + e.row);
       }
     }
   }
@@ -1470,7 +1474,7 @@ export default class BattleScene extends Phaser.Scene {
     let target = null, targetCol = 99;
     for (const e of this.enemies) {
       if (!e.alive) continue;
-      if (e.type === 'mandrake' && e.state !== 'emerged') continue;
+      if (e.type === 'rootabreak' && e.state === 'planted') continue;
       if (e.row === row && e.col > this.naviPos.col && e.col < targetCol) {
         target = e; targetCol = e.col;
       }
@@ -1540,7 +1544,7 @@ export default class BattleScene extends Phaser.Scene {
     let target = null, targetCol = 99;
     for (const e of this.enemies) {
       if (!e.alive) continue;
-      if (e.type === 'mandrake' && e.state !== 'emerged') continue;
+      if (e.type === 'rootabreak' && e.state === 'planted') continue;
       if (e.row === row && e.col > this.naviPos.col && e.col < targetCol) {
         target = e; targetCol = e.col;
       }
@@ -1606,7 +1610,7 @@ export default class BattleScene extends Phaser.Scene {
       const target = { col: this.naviPos.col + 1, row: this.naviPos.row };
       for (const e of this.enemies) {
         if (!e.alive) continue;
-        if (e.type === 'mandrake' && e.state !== 'emerged') continue;
+        if (e.type === 'rootabreak' && e.state === 'planted') continue;
         if (target.col === e.col && target.row === e.row) {
           this.damageEnemy(e, chip.damage);
         }
@@ -1662,7 +1666,7 @@ export default class BattleScene extends Phaser.Scene {
           // damage enemies on the landing tile + orthogonal adjacent
           for (const e of this.enemies) {
             if (!e.alive) continue;
-            if (e.type === 'mandrake' && e.state !== 'emerged') continue;
+            if (e.type === 'rootabreak' && e.state === 'planted') continue;
             const manhattan = Math.abs(e.col - targetCol) + Math.abs(e.row - targetRow);
             if (manhattan <= 1) {
               this.damageEnemy(e, chip.damage);
@@ -1687,7 +1691,7 @@ export default class BattleScene extends Phaser.Scene {
       // damage every hittable enemy ahead on the row (pierce, no early stop)
       for (const e of this.enemies) {
         if (!e.alive) continue;
-        if (e.type === 'mandrake' && e.state !== 'emerged') continue;
+        if (e.type === 'rootabreak' && e.state === 'planted') continue;
         if (e.row === row && e.col > this.naviPos.col) {
           this.damageEnemy(e, chip.damage);
           this.flash(e.sprite, chip.color);
@@ -1731,7 +1735,7 @@ export default class BattleScene extends Phaser.Scene {
       if (proj.x > 1020) { proj.destroy(); continue; }
       for (const e of this.enemies) {
         if (!e.alive) continue;
-        if (e.type === 'mandrake' && e.state !== 'emerged') continue;
+        if (e.type === 'rootabreak' && e.state === 'planted') continue;
         if (this.projOverlapsTile(proj, e.col, e.row)) {
           this.damageEnemy(e, proj.getData('damage'));
           proj.destroy();
@@ -1747,7 +1751,7 @@ export default class BattleScene extends Phaser.Scene {
     for (const e of this.enemies) {
       if (!e.alive) continue;
       if (e.type === 'pumpkin') this.pumpkinAI(e, time);
-      else if (e.type === 'mandrake') this.mandrakeAI(e, time);
+      else if (e.type === 'rootabreak') this.rootabreakAI(e, time);
       else if (e.type === 'skitterbug') this.skitterbugAI(e, time);
       else if (e.type === 'sentry') this.sentryAI(e, time);
       else if (e.type === 'bombspider') this.bombSpiderAI(e, time);
@@ -1796,61 +1800,94 @@ export default class BattleScene extends Phaser.Scene {
 
   // ================= mandrake AI =================
 
-  mandrakeAI(md, time) {
-    if (!md.alive || time < md.timer) return;
-    const manual = MANDRAKE_MANUAL * (md.big ? 1.35 : 1);
-
-    if (md.state === 'burrowed') {
-      // start telegraph: flash its tile
-      md.state = 'telegraph';
-      md.timer = time + M.telegraphMs;
-      md.warnRect = this.highlightTile(md.col, md.row, 0xba68c8, 0.45);
-      this.tweens.add({ targets: md.warnRect, alpha: 0.1, duration: 120, yoyo: 5 });
-    } else if (md.state === 'telegraph') {
-      // EMERGE
-      if (md.warnRect) { md.warnRect.destroy(); md.warnRect = null; }
-      md.state = 'emerged';
-      md.timer = time + M.emergedMs;
-      md.mound.setVisible(false);
-      md.sprite.setVisible(true);
-      this.placeFighter(md.sprite, md.col, md.row, manual);
-      const targetScale = md.sprite.scaleX;
-      md.sprite.setScale(targetScale * 0.18);
-      this.tweens.add({ targets: md.sprite, scaleX: targetScale, scaleY: targetScale, duration: 180, ease: 'Back.easeOut' });
-      if (!this.mandrakeGagged) {
-        this.mandrakeGagged = true;
-        this.startDialogue(SCRIPTS.mandrakeGag);
-      }
-    } else if (md.state === 'emerged') {
-      // SCREAM — row-wide noise attack
-      md.state = 'burrowed';
-      md.timer = time + M.burrowedMs;
-      const rowC = tileCenter(md.col, md.row);
-      // scream wave visual across the row, following the perspective
-      const left = project(0, md.row + 0.5);
-      const right = project(6, md.row + 0.5);
-      const wave = this.add.rectangle((left.x + right.x) / 2, rowC.y, right.x - left.x, 40, 0xba68c8, 0.35);
-      wave.setDepth(10 + md.row); // above the floor, ordered by row
-      this.tweens.add({ targets: wave, alpha: 0, x: left.x - 40, duration: 350,
-        onComplete: () => wave.destroy() });
-      this.add.text(rowC.x, rowC.y - 70, 'KYAAAH!!', {
-        fontFamily: 'monospace', fontSize: '22px', color: '#ba68c8',
-      }).setOrigin(0.5).setDepth(10 + md.row).setName('screamText');
-      this.time.delayedCall(600, () => {
-        const t = this.children.getByName('screamText');
-        if (t) t.destroy();
-      });
-      if (this.naviPos.row === md.row) {
-        this.damageNavi(M.screamDamage);
-      }
-      // burrow at a new random enemy tile
-      md.sprite.setVisible(false);
-      md.col = Phaser.Math.Between(3, 5);
-      md.row = Phaser.Math.Between(0, ROWS - 1);
-      const np = tileFeet(md.col, md.row);
-      md.mound.setPosition(np.x, np.y - 8).setVisible(true);
-      md.mound.setDepth(9 + md.row).setScale(np.s);
+  rootabreakAI(md, time) {
+    if (!md.alive) return;
+    // init jump timer on first tick: column-synced (same col jumps together,
+    // each column to the right is slightly delayed)
+    if (md.nextJump < 0) {
+      md.nextJump = time + M.plantedMs + (md.col - 3) * M.columnDelayMs;
+      return;
     }
+    if (md.state !== 'planted' || time < md.nextJump) return;
+
+    // LEAP: hide sprout, show sprite, jump up
+    md.state = 'leaping';
+    md.sprout.setVisible(false);
+    md.sprite.setVisible(true);
+    const manual = MANDRAKE_MANUAL * (md.big ? 1.35 : 1);
+    this.placeFighter(md.sprite, md.col, md.row, manual);
+    // pop-in scale
+    const targetScale = md.sprite.scaleX;
+    md.sprite.setScale(targetScale * 0.3);
+    this.tweens.add({
+      targets: md.sprite, scaleX: targetScale, scaleY: targetScale,
+      duration: 150, ease: 'Back.easeOut',
+    });
+    // leap up
+    this.tweens.add({
+      targets: md.sprite, y: md.homeY - M.leapHeightPx,
+      duration: M.leapMs, ease: 'Quad.easeOut',
+      onComplete: () => {
+        if (!md.alive) return;
+        // SCREAM at peak: KYAAAH!! + noise projectiles left and right
+        md.state = 'screaming';
+        const sc = tileCenter(md.col, md.row);
+        md.screamText = this.add.text(sc.x, sc.y - 110, 'KYAAAH!!', {
+          fontFamily: 'monospace', fontSize: '22px', color: '#ce93d8',
+          stroke: '#2a0a2a', strokeThickness: 4,
+        }).setOrigin(0.5).setDepth(10 + md.row);
+        this.spawnNoiseProjectile(md, -1); // left
+        this.spawnNoiseProjectile(md, 1);  // right
+        if (!this.mandrakeGagged) {
+          this.mandrakeGagged = true;
+          this.startDialogue(SCRIPTS.mandrakeGag);
+        }
+        // hang at peak briefly, then fall
+        this.time.delayedCall(350, () => {
+          if (!md.alive) return;
+          md.state = 'falling';
+          if (md.screamText) { md.screamText.destroy(); md.screamText = null; }
+          this.tweens.add({
+            targets: md.sprite, y: md.homeY,
+            duration: M.leapMs, ease: 'Quad.easeIn',
+            onComplete: () => {
+              if (!md.alive) return;
+              // LAND: re-plant
+              md.state = 'planted';
+              md.sprite.setVisible(false);
+              md.sprout.setVisible(true);
+              md.nextJump = this.time.now + M.plantedMs + (md.col - 3) * M.columnDelayMs;
+            },
+          });
+        });
+      },
+    });
+  }
+
+  spawnNoiseProjectile(md, dir) {
+    // Curved zigzag line representing unpleasant noise. Travels horizontally.
+    const g = this.add.graphics();
+    const color = 0xce93d8;
+    g.lineStyle(3, color, 1);
+    // zigzag: 5 peaks across 48px, alternating up/down
+    const len = 48, peaks = 5, amp = 9;
+    let px = 0, py = 0;
+    for (let i = 1; i <= peaks * 2; i++) {
+      const nx = (len / (peaks * 2)) * i;
+      const ny = (i % 2 === 1) ? -amp : amp;
+      // curve: use quadratic with control point for rounded zigzag
+      g.lineBetween(px, py, nx, ny);
+      px = nx; py = ny;
+    }
+    const p = tileCenter(md.col, md.row);
+    g.setPosition(p.x, p.y - 40);
+    g.setDepth(10 + md.row);
+    g.setData('vx', dir * M.noiseSpeed);
+    g.setData('row', md.row);
+    g.setData('damage', M.screamDamage);
+    // flip for left-moving so the zigzag leads with the direction
+    if (dir < 0) g.setScale(-1, 1);
+    this.enemyProjectiles.add(g);
   }
 
   // ================= skitterbug AI =================
@@ -2104,11 +2141,12 @@ export default class BattleScene extends Phaser.Scene {
     for (const b of [...this.enemyProjectiles.getChildren()]) {
       if (!b.active) continue;
       b.x += b.getData('vx') * dt;
-      if (b.x < -20) { b.destroy(); continue; }
+      // destroy off-screen either side (noise travels both directions)
+      if (b.x < -60 || b.x > 1020) { b.destroy(); continue; }
       // hits the navi if on her row and overlapping her tile
       if (b.getData('row') === this.naviPos.row
         && this.projOverlapsTile(b, this.naviPos.col, this.naviPos.row)) {
-        this.damageNavi(SKITTER.bulletDamage);
+        this.damageNavi(b.getData('damage') ?? SKITTER.bulletDamage);
         b.destroy();
       }
     }
@@ -2136,7 +2174,8 @@ export default class BattleScene extends Phaser.Scene {
     if (e.hp <= 0) {
       e.alive = false;
       if (e.warnRect) { e.warnRect.destroy(); e.warnRect = null; }
-      if (e.mound) e.mound.setVisible(false);
+      if (e.sprout) e.sprout.setVisible(false);
+      if (e.screamText) { e.screamText.destroy(); e.screamText = null; }
       if (e.sensor) { this.tweens.killTweensOf(e.sensor); e.sensor.setVisible(false); }
       if (e.bombBack) { e.bombBack.destroy(); e.bombBack = null; }
       if (e.bombWarns) { e.bombWarns.forEach((w) => w.destroy()); e.bombWarns = null; }

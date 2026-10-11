@@ -12,7 +12,7 @@ export const CHARACTERS = {
   bugchan:  { name: 'Bugchan',       mugshot: 'mug-bugchan',  side: 'left',  color: '#ff9ecf' },
   mel:      { name: 'Mel',           mugshot: null,           side: 'left',  color: '#e8f6ff' },
   pumpkin:  { name: 'PUMPKIN.EXE',   mugshot: 'mug-pumpkin',  side: 'right', color: '#ffb74d' },
-  mandrake: { name: 'RUTABAGA.MND',  mugshot: 'mug-mandrake', side: 'right', color: '#ce93d8' },
+  rootabreak: { name: 'ROOTABREAK',  mugshot: 'mug-mandrake', side: 'right', color: '#ce93d8' },
   skitterbug: { name: 'SKITTERBUG',  mugshot: null,           side: 'right', color: '#9dbb2e' },
   sentry:   { name: 'SENTRY',        mugshot: null,           side: 'right', color: '#ff3b30' },
   bombspider: { name: 'BOMB SPIDER',  mugshot: null,           side: 'right', color: '#ff6f00' },
@@ -177,7 +177,7 @@ export const SCRIPTS = {
     { speaker: 'bugchan', text: 'Not on my watch! Mel, send chips! I will debug this gourd!' },
   ],
   mandrakeGag: [
-    { speaker: 'mandrake', text: 'KYAAAH!!' },
+    { speaker: 'rootabreak', text: 'KYAAAH!!' },
     { speaker: 'bugchan', text: "Phew... smells like grandma's root cellar in here!" },
   ],
   victory: [
