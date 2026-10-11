@@ -1530,7 +1530,7 @@ export default class BattleScene extends Phaser.Scene {
   // first enemy ahead; shows the punch frame + a muzzle flash.
   fireShoot(time) {
     if (time < this.shootReadyAt) return;
-    this.shootReadyAt = time + 300;
+    this.shootReadyAt = time + 150;
     this.showPunchFrame();
     const row = this.naviPos.row;
     const s = this.navi.scaleX;
@@ -1552,7 +1552,7 @@ export default class BattleScene extends Phaser.Scene {
     beam.setLineWidth(3).setAlpha(0.9);
     beam.setDepth(10 + row); // row-ordered like the other battle effects
     this.tweens.add({ targets: beam, alpha: 0, duration: 110, onComplete: () => beam.destroy() });
-    if (target) { this.damageEnemy(target, 10); this.flash(target.sprite, 0xfff176); }
+    if (target) { this.damageEnemy(target, 5); this.flash(target.sprite, 0xfff176); }
   }
 
   // Punch frame for the buster. Mel is drawing the real punch frame +
