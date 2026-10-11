@@ -206,8 +206,13 @@ export const RootabreakMethods = {
     // perspective: match the sprite's scale (going forward, all projectiles
     // should inherit perspective from their source)
     const ps = md.sprite.scaleX;
-    // spawn at mouth height (upper sprite), scaled by perspective
-    g.setPosition(md.sprite.x, md.sprite.y - 0.5 * md.sprite.displayHeight);
+    // spawn half a tile out in the travel direction, at mouth height
+    const corners = tileCorners(md.col, md.row);
+    const tileW = Math.max(...corners.map((p) => p.x)) - Math.min(...corners.map((p) => p.x));
+    g.setPosition(
+      md.sprite.x + dir * tileW * 0.5,
+      md.sprite.y - 0.5 * md.sprite.displayHeight
+    );
     g.setScale(ps);
     g.setDepth(10 + md.row);
     g.setData('vx', dir * ROOTABREAK.noiseSpeed);
