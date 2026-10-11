@@ -672,11 +672,17 @@ export default class BattleScene extends Phaser.Scene {
         b.setScale(base * (1 + ex * 0.6));
       }
       // destroy off-screen either side (noise travels both directions)
-      if (b.x < -60 || b.x > 1020) { b.destroy(); continue; }
+      if (b.x < -60 || b.x > 1020) {
+        const hh = b.getData('tileHighlight');
+        if (hh && hh.active) hh.destroy();
+        b.destroy(); continue;
+      }
       // hits the navi if on her row and overlapping her tile
       if (b.getData('row') === this.naviPos.row
         && this.projOverlapsTile(b, this.naviPos.col, this.naviPos.row)) {
         this.damageNavi(b.getData('damage') ?? SKITTER.bulletDamage);
+        const hh2 = b.getData('tileHighlight');
+        if (hh2 && hh2.active) hh2.destroy();
         b.destroy();
       }
     }
