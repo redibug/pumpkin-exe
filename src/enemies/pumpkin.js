@@ -85,24 +85,48 @@ export const PumpkinMethods = {
       this.teleportMove(e.sprite, nc, nr, BOSS.manualScale);
     }
 
-    // telegraphed tile slam on the navi's tile
+    // telegraphed pumpkin drop: floating pumpkin slams onto the navi's tile
     if (time >= e.nextAttack) {
       e.nextAttack = time + phase.attackIntervalMs;
       const target = { col: this.naviPos.col, row: this.naviPos.row };
       const warn = this.highlightTile(target.col, target.row, 0xff5252, 0.4);
-      this.time.delayedCall(700, () => {
+      // float delay shrinks as HP drops: 500ms full -> 200ms near death
+      const hpFrac = e.hp / e.maxHp;
+      const floatMs = 200 + 300 * hpFrac;
+      // spawn pumpkin above the target tile
+      const tc = tileCenter(target.col, target.row);
+      const tf = tileFeet(target.col, target.row);
+      const drop = this.add.image(tc.x, tc.y - 420 * tf.s, 'pumpkin-drop');
+      drop.setScale(tf.s * 0.9);
+      drop.setDepth(10 + target.row);
+      drop.setAngle(Phaser.Math.Between(-8, 8));
+      // gentle hover wobble while floating
+      const wobble = this.tweens.add({
+        targets: drop, y: drop.y - 12 * tf.s,
+        duration: 240, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+      });
+      this.time.delayedCall(floatMs, () => {
         warn.destroy();
-        sound.slam();
-        if (this.over) return;
-        // hit if navi is still on the warned tile
-        if (this.naviPos.col === target.col && this.naviPos.row === target.row) {
-          this.damageNavi(20);
-        }
-        const bc = tileCenter(target.col, target.row);
-        const boom = this.add.circle(bc.x, bc.y, 40, 0xff9e2c, 0.5);
-        boom.setDepth(10 + target.row); // above the floor, ordered by row
-        this.tweens.add({ targets: boom, alpha: 0, scale: 1.6, duration: 250,
-          onComplete: () => boom.destroy() });
+        if (this.over || !e.alive) { wobble.stop(); drop.destroy(); return; }
+        wobble.stop();
+        // slam down fast
+        this.tweens.add({
+          targets: drop, y: tc.y, angle: 0,
+          duration: 160, ease: 'Quad.easeIn',
+          onComplete: () => {
+            if (this.over) { drop.destroy(); return; }
+            sound.slam();
+            sound.explosion();
+            this.playExplosion(tc.x, tc.y, tf.s * 0.8);
+            // screen shake
+            this.cameras.main.shake(120, 0.008);
+            // hit if navi is still on the warned tile
+            if (this.naviPos.col === target.col && this.naviPos.row === target.row) {
+              this.damageNavi(20);
+            }
+            drop.destroy();
+          },
+        });
       });
     }
   }
