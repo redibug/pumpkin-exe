@@ -478,14 +478,14 @@ export default class BattleScene extends Phaser.Scene {
     sprite.setData('fitMax', AUTOSCALE.bombspider ?? FIT_MAX);
     sprite.setOrigin(0.5, 1);
     this.placeFighter(sprite, col, row, BOMB_SPIDER_MANUAL);
-    // bomb on the back: sits on top of the spider, plays fuse animation
+    // bomb on the back: sits at the abdomen, layered BEHIND the spider
     const bombBack = this.add.sprite(0, 0, 'bomb');
     bombBack.play('bomb-fuse');
-    bombBack.setOrigin(0.5, 1);
+    bombBack.setOrigin(0.5, 0.5);
     // scale bomb relative to spider (bomb art is 64px, spider is 128px wide)
     const bombScale = sprite.scaleX * 0.9;
     bombBack.setScale(bombScale);
-    bombBack.setDepth(sprite.depth + 0.5);
+    bombBack.setDepth(sprite.depth - 0.5); // behind the spider
     this.positionBombBack({ sprite, bombBack });
     const enemy = {
       type: 'bombspider', sprite, bombBack, col, row,
@@ -499,12 +499,12 @@ export default class BattleScene extends Phaser.Scene {
     return enemy;
   }
 
-  // Position the back-bomb on top of the spider
+  // Position the back-bomb at the spider's abdomen, layered behind
   positionBombBack(e) {
     const s = e.sprite;
-    // bomb bottom sits on the spider's top, with slight overlap
-    e.bombBack.setPosition(s.x, s.y - s.displayHeight + e.bombBack.displayHeight * 0.25);
-    e.bombBack.setDepth(s.depth + 0.5);
+    // center of the bomb at ~55% up the spider's body (abdomen position)
+    e.bombBack.setPosition(s.x, s.y - s.displayHeight * 0.55);
+    e.bombBack.setDepth(s.depth - 0.5); // behind the spider
   }
 
   // HP number floating above an enemy's head
