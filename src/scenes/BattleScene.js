@@ -196,7 +196,6 @@ export default class BattleScene extends Phaser.Scene {
     this.battleIndex = data.battleIndex || 0;
     // HP carries between battles (no heal); defaults to full on fresh start/retry
     this._carriedHp = (typeof data.naviHp === 'number') ? data.naviHp : 100;
-    console.log(`[HP DEBUG] init: battleIndex=${this.battleIndex}, data.naviHp=${data.naviHp}, _carriedHp=${this._carriedHp}`);
   }
 
   preload() {
@@ -262,19 +261,23 @@ export default class BattleScene extends Phaser.Scene {
     this.drawGrid();
     this.drawHud();
 
-    // player idle animation (8-frame strip)
-    this.anims.create({
-      key: 'bugchan-idle',
-      frames: this.anims.generateFrameNumbers('bugchan', { start: 0, end: 7 }),
-      frameRate: 8,
-      repeat: -1,
-    });
-    this.anims.create({
-      key: 'bomb-fuse',
-      frames: this.anims.generateFrameNumbers('bomb', { start: 0, end: 1 }),
-      frameRate: 8,
-      repeat: -1,
-    });
+    // player idle animation (8-frame strip) — only create once (anims persist across restarts)
+    if (!this.anims.exists('bugchan-idle')) {
+      this.anims.create({
+        key: 'bugchan-idle',
+        frames: this.anims.generateFrameNumbers('bugchan', { start: 0, end: 7 }),
+        frameRate: 8,
+        repeat: -1,
+      });
+    }
+    if (!this.anims.exists('bomb-fuse')) {
+      this.anims.create({
+        key: 'bomb-fuse',
+        frames: this.anims.generateFrameNumbers('bomb', { start: 0, end: 1 }),
+        frameRate: 8,
+        repeat: -1,
+      });
+    }
 
     const p = tileFeet(this.naviPos.col, this.naviPos.row);
     this.navi = this.physics.add.sprite(p.x, p.y, 'bugchan');
@@ -2227,7 +2230,6 @@ export default class BattleScene extends Phaser.Scene {
       this.startDialogue(battle.victory, () => {
         this.startDialogue(battle.story, () => {
           // no heal between battles: carry current HP forward
-          console.log(`[HP DEBUG] restarting: battleIndex=${this.battleIndex + 1}, naviHp=${this.naviHp}`);
           this.scene.restart({ battleIndex: this.battleIndex + 1, naviHp: this.naviHp });
         });
       });
