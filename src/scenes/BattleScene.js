@@ -12,6 +12,9 @@ import { SentryMethods } from '../enemies/sentry.js';
 import { BombSpiderMethods } from '../enemies/bombSpider.js';
 import { RootabreakMethods } from '../enemies/rootabreak.js';
 import { PumpkinMethods } from '../enemies/pumpkin.js';
+import { EffectsMethods } from '../systems/effects.js';
+import { CustomScreenMethods, CUSTOM_GAUGE_MS, HAND_MAX, LOADOUT_MAX } from '../ui/customScreen.js';
+import { NaviMethods, NAVI_MANUAL } from '../player/navi.js';
 
 // BattleScene — written during the jam 72h window (2026-10-09).
 // MMBN-style grid battle: Bugchan (navi) vs PUMPKIN.EXE + RUTABAGA.MND.
@@ -23,13 +26,9 @@ import { PumpkinMethods } from '../enemies/pumpkin.js';
 // Mel: edit freely — enemy comps, names, dialogue. Simple words, short lines.
 
 // Manual artistic scales on top of the auto-fit + perspective scale.
-const NAVI_MANUAL = 1;
 const BOSS_MANUAL = 0.5;
 
-// ---- custom screen / deck ----
-const CUSTOM_GAUGE_MS = 10000; // battle time to fill the custom gauge
-const HAND_MAX = 5;            // chip-case slots in the custom screen
-const LOADOUT_MAX = 4;         // selected cards -> the 1-4 chip slots
+// ---- custom screen config lives in src/ui/customScreen.js ----
 
 // ---- glassy tile palette (base colors live in grid-config.json) ----
 const WHITE = { r: 255, g: 255, b: 255 };
@@ -331,183 +330,16 @@ export default class BattleScene extends Phaser.Scene {
   // Confirming spends the old loadout to the discard pile and loads the
   // new picks. OK is an on-screen button, navigable with the arrows and
   // clickable with the mouse (ESC still cancels).
-  openCustom(skipKeyGuard = false) {
-    if (this.customOpen || this.over || this.dialogue.isActive()) return;
-    this.customOpen = true;
-    this.customTimer = 0;
-    this.updateCustomGaugeHud();
-    this.setPaused(true);
-    this.drawToHand();
-    this.customCursor = { row: 0, col: 0 }; // row 0 = cards, row 1 = OK button
-    this.customOkFromCol = HAND_MAX - 1; // Left/Up from OK returns here
-    this.customSelected = []; // hand indices, in selection order
-    this.customDiscard = []; // hand indices marked for discard (red X)
-    this.buildCustomUI();
-    // The keyboard plugin emits 'keydown-Z' BEFORE generic 'keydown'. If this
-    // screen was opened by Z/Space/Enter, our 'keydown' handler (registered
-    // during the 'keydown-X' dispatch) would fire for that SAME press and
-    // auto-select the first chip. Swallow that one emit.
-    const JustDown = Phaser.Input.Keyboard.JustDown;
-    this._swallowCustomKeydown = !skipKeyGuard &&
-      (JustDown(this.chipFrontKey) || JustDown(this.chipFrontKey2) || JustDown(this.enterKey));
-    // Swallow the input that opened the screen: the opening click is still
-    // being dispatched when the cards are created, so it would pass through
-    // and "click" a card. Arm on pointer-up (or immediately if no pointer
-    // is down, i.e. opened via keyboard).
-    this.customArmed = !this.input.activePointer.isDown;
-    this._customArmHandler = () => { this.customArmed = true; };
-    this.input.once('pointerup', this._customArmHandler);
-    this._customKeyHandler = (event) => {
-      if (this._swallowCustomKeydown) { this._swallowCustomKeydown = false; return; }
-      this.handleCustomKey(event);
-    };
-    this.input.keyboard.on('keydown', this._customKeyHandler);
-  }
 
-  drawToHand() {
-    // chip case: new chips load into the empty slots; the rest stay put
-    for (let i = 0; i < HAND_MAX; i++) {
-      if (this.hand[i]) continue;
-      if (this.deck.length === 0) {
-        if (this.discardPile.length === 0) break;
-        this.deck = Phaser.Utils.Array.Shuffle(this.discardPile);
-        this.discardPile = [];
-      }
-      this.hand[i] = this.deck.pop();
-    }
-  }
 
-  handleCustomKey(event) {
-    const cur = this.customCursor;
-    switch (event.code) {
-      case 'ArrowUp':
-        if (cur.row === 1) { cur.row = 0; cur.col = this.customOkFromCol; }
-        else cur.col = Math.max(0, cur.col - 1);
-        break;
-      case 'ArrowDown':
-        if (cur.row === 0) {
-          if (cur.col >= HAND_MAX - 1) {
-            this.customOkFromCol = cur.col;
-            cur.row = 1; cur.col = 0;
-          } else cur.col = Math.min(HAND_MAX - 1, cur.col + 1);
-        }
-        break;
-      case 'ArrowRight':
-        // OK button sits in the right column: Right reaches it from the chips
-        if (cur.row === 0) {
-          this.customOkFromCol = cur.col;
-          cur.row = 1; cur.col = 0;
-        }
-        break;
-      case 'ArrowLeft':
-        // Left from OK returns to the chip we came from
-        if (cur.row === 1) { cur.row = 0; cur.col = this.customOkFromCol; }
-        break;
-      case 'KeyZ':
-        this.activateCustomCursor();
-        return;
-      case 'KeyX':
-        if (cur.row === 0) this.toggleCustomDiscard();
-        break;
-      case 'Escape':
-        this.cancelCustom();
-        return;
-      default:
-        return;
-    }
-    this.refreshCustom();
-  }
 
   // Z: the generic "press" key — toggles a card, or pushes the OK button
-  activateCustomCursor() {
-    const cur = this.customCursor;
-    if (cur.row === 0) {
-      this.toggleCustomSelect();
-      this.refreshCustom();
-    } else {
-      this.confirmCustom();
-    }
-  }
 
-  toggleCustomSelect() {
-    const i = this.customCursor.col;
-    if (i < 0 || i >= HAND_MAX || !this.hand[i]) return; // empty slot
-    const at = this.customSelected.indexOf(i);
-    if (at >= 0) {
-      this.customSelected.splice(at, 1);
-    } else {
-      const m = this.customDiscard.indexOf(i); // selecting clears a discard mark
-      if (m >= 0) this.customDiscard.splice(m, 1);
-      if (this.customSelected.length < LOADOUT_MAX) this.customSelected.push(i);
-    }
-  }
 
   // X: mark a card for discard (red X) — toggles; marking clears selection
-  toggleCustomDiscard() {
-    const i = this.customCursor.col;
-    if (i < 0 || i >= HAND_MAX || !this.hand[i]) return; // empty slot
-    const m = this.customDiscard.indexOf(i);
-    if (m >= 0) {
-      this.customDiscard.splice(m, 1);
-    } else {
-      const at = this.customSelected.indexOf(i);
-      if (at >= 0) this.customSelected.splice(at, 1);
-      this.customDiscard.push(i);
-    }
-  }
 
-  confirmCustom() {
-    if (this.customSelected.length === 0 && this.customDiscard.length === 0) {
-      this.closeCustomUI(); // nothing picked or marked: keep loadout
-      return;
-    }
-    const picked = this.customSelected.map((i) => this.hand[i]); // selection order
-    const tossed = this.customDiscard.map((i) => this.hand[i]);
-    // old loadout is spent, marked cards are tossed
-    this.loadout.forEach((id) => { if (id) this.discardPile.push(id); });
-    tossed.forEach((id) => this.discardPile.push(id));
-    this.loadout = [null, null, null, null];
-    this.chipAmmo = [null, null, null, null];
-    this.rapidFiring = null;
-    picked.forEach((id, s) => { this.loadout[s] = id; });
-    // picked + tossed cards leave their slots empty (chip case keeps position)
-    const gone = new Set([...this.customSelected, ...this.customDiscard]);
-    gone.forEach((i) => { this.hand[i] = null; });
-    this.updateLoadoutHud();
-    this.closeCustomUI();
-  }
 
-  cancelCustom() {
-    this.closeCustomUI(); // gauge stays spent, loadout unchanged
-  }
 
-  closeCustomUI() {
-    this.input.keyboard.off('keydown', this._customKeyHandler);
-    this._customKeyHandler = null;
-    this.input.off('pointerup', this._customArmHandler);
-    this.input.off('pointermove', this._customDragMove);
-    this.input.off('pointerup', this._customDragUp);
-    this._customDragMove = null; this._customDragUp = null;
-    if (this.customUI) { this.customUI.destroy(); this.customUI = null; }
-    if (this.customBackdrop) { this.customBackdrop.destroy(); this.customBackdrop = null; }
-    this.customCards = null;
-    this.customOpen = false;
-    // Consume any pending JustDown edges: _justDown persists until read or
-    // key-up, so the key that closed the screen would otherwise fire a chip
-    // on a later frame (e.g. if still held).
-    const JD = Phaser.Input.Keyboard.JustDown;
-    JD(this.shootKey); JD(this.chipFrontKey); JD(this.chipFrontKey2); JD(this.enterKey);
-    Object.values(this.keys).forEach(JD);
-    this.setPaused(false);
-    // Grace period: bomb spiders restart their move cycle after the custom
-    // screen (don't throw immediately)
-    for (const e of this.enemies) {
-      if (e.type === 'bombspider' && e.alive) {
-        e.movesDone = 0;
-        e.nextMove = this.time.now + 2000;
-      }
-    }
-  }
 
   // ================= custom screen (redesigned) =================
   // Left-side panel (draggable by the top handle) so the enemy layout stays
@@ -515,186 +347,10 @@ export default class BattleScene extends Phaser.Scene {
   // frame; highlighting a chip shows its large art + name + desc.
   // Selecting slides a chip right; marking for discard slides it left.
 
-  buildCustomUI() {
-    const PANEL_W = 400, PANEL_H = 508;
-    // subtle dim outside the panel (kept out of the draggable container)
-    this.customBackdrop = this.add.rectangle(480, 270, 960, 540, 0x05070f, 0.35)
-      .setDepth(199).setScrollFactor(0);
-    const ui = this.add.container(16, 16).setDepth(200).setScrollFactor(0);
-    this.customUI = ui;
-
-    ui.add(this.add.rectangle(PANEL_W / 2, PANEL_H / 2, PANEL_W, PANEL_H, 0x0a1226, 1)
-      .setStrokeStyle(3, 0x00e5ff));
-
-    // top handle: drag the window around with the mouse
-    const handle = this.add.rectangle(PANEL_W / 2, 18, PANEL_W, 36, 0x0d1b33)
-      .setStrokeStyle(2, 0x00e5ff);
-    handle.setInteractive({ useHandCursor: true });
-    ui.add(handle);
-    ui.add(this.add.text(PANEL_W / 2, 18, 'CUSTOM SCREEN', {
-      fontFamily: 'monospace', fontSize: '20px', color: '#00e5ff',
-    }).setOrigin(0.5));
-    let dragging = false, dragDX = 0, dragDY = 0;
-    handle.on('pointerdown', (pointer) => {
-      if (!this.customArmed) return; // ignore the click that opened the screen
-      dragging = true;
-      dragDX = pointer.x - ui.x;
-      dragDY = pointer.y - ui.y;
-    });
-    this._customDragMove = (pointer) => {
-      if (!dragging || !pointer.isDown) return;
-      ui.x = Phaser.Math.Clamp(pointer.x - dragDX, -PANEL_W + 80, 960 - 80);
-      ui.y = Phaser.Math.Clamp(pointer.y - dragDY, 0, 540 - 80);
-    };
-    this._customDragUp = () => { dragging = false; };
-    this.input.on('pointermove', this._customDragMove);
-    this.input.on('pointerup', this._customDragUp);
-
-    // ---- Row 1: deck info row ----
-    // (handle with title is above; indicators sit just below it)
-
-    // ---- Row 2: chip row ----
-    // Left column: chip selection, shifted down to clear the indicators.
-    // persistent chip cards (built once so select/mark can slide-tween).
-    // Layering: icon (label) below, frame on top. The frame is 32x32 with a
-    // 22x22 hole at x=[5,26], y=[4,25]; at 64x64 the hole is 44x44 centered
-    // at (0,-2), so the icon is 44x44 at (0,-2) to exactly fill it.
-    this.customCards = [];
-    for (let i = 0; i < HAND_MAX; i++) {
-      const baseX = 72, baseY = 110 + i * 76;
-      const root = this.add.container(baseX, baseY);
-      const halo = this.add.rectangle(0, 0, 76, 76, 0xffffff, 0.12)
-        .setStrokeStyle(2, 0xffffff).setVisible(false);
-      const icon = this.add.image(0, -2, 'chip-empty').setDisplaySize(44, 44);
-      const frame = this.add.image(0, 0, 'chip-frame').setDisplaySize(64, 64);
-      // selection order + discard X live in the top-left corner of the chip
-      const selText = this.add.text(-26, -28, '', {
-        fontFamily: 'monospace', fontSize: '18px', color: '#00e5ff',
-      }).setOrigin(0.5).setVisible(false);
-      // red X for marked (discard): small badge in the corner
-      const m = 10;
-      const x1 = this.add.line(-24, -24, -m, -m, m, m, 0xff3b30).setOrigin(0, 0).setLineWidth(5).setVisible(false);
-      const x2 = this.add.line(-24, -24, m, -m, -m, m, 0xff3b30).setOrigin(0, 0).setLineWidth(5).setVisible(false);
-      const tint = this.add.rectangle(0, 0, 64, 64, 0xff3b30, 0.15).setVisible(false);
-      root.add([halo, icon, frame, tint, x1, x2, selText]);
-      frame.setInteractive({ useHandCursor: true });
-      frame.on('pointerover', () => {
-        this.customCursor = { row: 0, col: i };
-        this.refreshCustom();
-      });
-      frame.on('pointerdown', (pointer) => {
-        if (!this.customArmed) return;
-        this.customCursor = { row: 0, col: i };
-        if (pointer.rightButtonDown()) this.toggleCustomDiscard();
-        else this.toggleCustomSelect();
-        this.refreshCustom();
-      });
-      ui.add(root);
-      this.customCards.push({ root, halo, frame, icon, selText, x1, x2, tint, baseX });
-    }
-
-    // Right column: selected chip info (image, name, desc, then OK button).
-    // Shifted down a little for visual balance.
-    // The art fits dynamically within 160x160, preserving aspect ratio.
-    this.customDetailImage = this.add.image(265, 185, 'chip-empty');
-    this.fitImageToArea(this.customDetailImage, 160, 160);
-    this.customDetailName = this.add.text(265, 280, '', {
-      fontFamily: 'monospace', fontSize: '20px', color: '#e8f6ff',
-    }).setOrigin(0.5);
-    this.customDetailDesc = this.add.text(265, 307, '', {
-      fontFamily: 'monospace', fontSize: '13px', color: '#9fb3c8',
-      wordWrap: { width: 190 }, align: 'center',
-    }).setOrigin(0.5, 0);
-    ui.add([this.customDetailImage, this.customDetailName, this.customDetailDesc]);
-
-    // deck/discard/selected/marked indicators at the top of the window
-    this.customCountsText = this.add.text(200, 55, '', {
-      fontFamily: 'monospace', fontSize: '12px', color: '#9fb3c8',
-    }).setOrigin(0.5);
-    ui.add(this.customCountsText);
-
-    // OK button: centered in the right column, under the chip info
-    const okX = 265, okY = 410;
-    this.customOkBg = this.add.rectangle(okX, okY, 110, 36, 0x0d1526)
-      .setStrokeStyle(2, 0x00e5ff);
-    this.customOkBg.setInteractive({ useHandCursor: true });
-    this.customOkBg.on('pointerover', () => {
-      this.customCursor = { row: 1, col: 0 };
-      this.refreshCustom();
-    });
-    this.customOkBg.on('pointerdown', () => {
-      if (!this.customArmed) return;
-      this.confirmCustom();
-    });
-    this.customOkLabel = this.add.text(okX, okY, 'OK', {
-      fontFamily: 'monospace', fontSize: '18px', color: '#e8f6ff',
-    }).setOrigin(0.5);
-    ui.add([this.customOkBg, this.customOkLabel]);
-
-    // ---- Row 3: controls row ----
-    ui.add(this.add.text(200, 490, 'up/down: move · Z/click: select · X/right-click: discard', {
-      fontFamily: 'monospace', fontSize: '10px', color: '#9fb3c8',
-    }).setOrigin(0.5));
-
-    this.refreshCustom();
-  }
 
   // Scale an image to fit within a max area, preserving aspect ratio.
   // Call after setTexture (reads the new texture's frame dimensions).
-  fitImageToArea(image, maxW, maxH) {
-    const scale = Math.min(maxW / image.width, maxH / image.height);
-    image.setDisplaySize(image.width * scale, image.height * scale);
-  }
 
-  refreshCustom() {
-    if (!this.customUI) return;
-    // cards
-    this.hand.forEach((chipId, i) => {
-      const card = this.customCards[i];
-      const isCursor = this.customCursor.row === 0 && this.customCursor.col === i;
-      const selIdx = this.customSelected.indexOf(i);
-      const marked = this.customDiscard.includes(i);
-      const selected = selIdx >= 0;
-      if (!chipId) {
-        card.frame.setAlpha(0.3);
-        card.icon.setVisible(false);
-        card.halo.setVisible(isCursor);
-        card.selText.setVisible(false);
-        card.x1.setVisible(false); card.x2.setVisible(false); card.tint.setVisible(false);
-        this.tweens.killTweensOf(card.root);
-        card.root.x = card.baseX;
-      } else {
-        card.frame.setAlpha(1);
-        card.icon.setVisible(true).setTexture(`chip-${chipId}-small`).setDisplaySize(44, 44);
-        card.halo.setVisible(isCursor);
-        card.selText.setVisible(selected).setText(selected ? `${selIdx + 1}→` : '');
-        card.tint.setVisible(marked);
-        card.x1.setVisible(marked); card.x2.setVisible(marked);
-        // slide: selected -> right, marked -> left
-        const targetX = card.baseX + (selected ? 14 : 0) + (marked ? -14 : 0);
-        if (card.root.x !== targetX) {
-          this.tweens.killTweensOf(card.root);
-          this.tweens.add({ targets: card.root, x: targetX, duration: 150, ease: 'Quad.easeOut' });
-        }
-      }
-      // detail panel follows the highlighted chip
-      if (isCursor && chipId) {
-        const chip = CHIP_MAP[chipId];
-        this.customDetailImage.setTexture(`chip-${chipId}`).setVisible(true);
-        this.fitImageToArea(this.customDetailImage, 160, 160);
-        this.customDetailName.setText(chip.name);
-        this.customDetailDesc.setText(chip.desc);
-      }
-    });
-    // OK button highlight
-    const okCursor = this.customCursor.row === 1;
-    this.customOkBg.setStrokeStyle(2, okCursor ? 0xffffff : 0x00e5ff);
-    this.customOkLabel.setColor(okCursor ? '#ffffff' : '#e8f6ff');
-    this.customCountsText.setText(
-      `deck: ${this.deck.length}   discard: ${this.discardPile.length}` +
-      `   selected: ${this.customSelected.length}/${LOADOUT_MAX}   marked: ${this.customDiscard.length}`,
-    );
-  }
 
   // ================= teleport =================
 
@@ -703,177 +359,12 @@ export default class BattleScene extends Phaser.Scene {
   // that jitter vertically and get erased, more intense in later frames.
   // 3 frames out (dissolve), then 3 in reverse (materialize).
   // Movement input / AI is locked per-sprite while its teleport runs.
-  teleportMove(sprite, col, row, manual, onDone) {
-    if (sprite.getData('teleporting')) {
-      this.placeFighter(sprite, col, row, manual); // fallback: instant pop
-      if (onDone) onDone();
-      return;
-    }
-    sprite.setData('teleporting', true);
-    this.playTeleportFrames(sprite, 'out', () => {
-      // abort if the sprite died mid-teleport
-      if (!sprite.getData('teleporting')) return;
-      this.placeFighter(sprite, col, row, manual);
-      this.playTeleportFrames(sprite, 'in', () => {
-        sprite.setData('teleporting', false);
-        if (onDone) onDone();
-      });
-    });
-  }
 
   // Dissolve a sprite into pixel chunks when it's deleted. Each chunk is baked
   // as its own canvas texture (no setCrop), positioned to tile the sprite's
   // display bounds. Chunks start intact, lerp outward top-to-bottom, then
   // delete top-to-bottom with a flicker.
-  dissolveSprite(sprite, onDone) {
-    const DURATION = 700;
-    const TARGET_PX = 10;
 
-    const frame = sprite.frame;
-    const fw = frame.width, fh = frame.height;
-    // Use the sprite's actual displayed bounds (accounts for origin, scale)
-    const bounds = sprite.getBounds();
-    const dispW = bounds.width, dispH = bounds.height;
-    const cols = Phaser.Math.Clamp(Math.round(dispW / TARGET_PX), 3, 30);
-    const rows = Phaser.Math.Clamp(Math.round(dispH / TARGET_PX), 3, 30);
-    // Exact fractional source size; canvas uses rounded integers, and the
-    // image scale is adjusted to compensate so chunks tile exactly.
-    const cwSrc = fw / cols, chSrc = fh / rows;
-    const cw = Math.max(1, Math.round(cwSrc)), ch = Math.max(1, Math.round(chSrc));
-    const chunkW = dispW / cols, chunkH = dispH / rows;
-    const adjX = cwSrc / cw, adjY = chSrc / ch; // scale correction
-    const key = sprite.texture.key;
-    const depth = sprite.depth;
-    const scaleX = sprite.scaleX * adjX, scaleY = sprite.scaleY * adjY;
-    const srcImg = sprite.texture.getSourceImage();
-
-    sprite.setVisible(false);
-
-    const chunks = [];
-    const texPrefix = `dissolve-${key}-${Phaser.Utils.String.UUID().slice(0, 8)}`;
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        // bake the chunk region into its own texture
-        const ck = `${texPrefix}-${c}-${r}`;
-        const tex = this.textures.createCanvas(ck, cw, ch);
-        const ctx = tex.getContext();
-        ctx.clearRect(0, 0, cw, ch);
-        ctx.drawImage(srcImg, c * cwSrc, r * chSrc, cwSrc, chSrc, 0, 0, cw, ch);
-        tex.refresh();
-
-        const cx = bounds.x + (c + 0.5) * chunkW;
-        const cy = bounds.y + (r + 0.5) * chunkH;
-        const img = this.add.image(cx, cy, ck);
-        img.setOrigin(0.5, 0.5).setScale(scaleX, scaleY).setDepth(depth + 1);
-
-        const scatterAt = (r / rows) * 0.45 + Math.random() * 0.15;
-        const dissolveAt = scatterAt + 0.2 + Math.random() * 0.2;
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 10 + Math.random() * 18;
-        chunks.push({
-          img, texKey: ck, ox: cx, oy: cy,
-          dx: Math.cos(angle) * dist, dy: Math.sin(angle) * dist - 12,
-          scatterAt, dissolveAt,
-        });
-      }
-    }
-
-    const progress = { t: 0 };
-    const tw = this.tweens.add({
-      targets: progress, t: 1, duration: DURATION, ease: 'Quad.easeIn',
-      onUpdate: () => {
-        for (const ch of chunks) {
-          if (progress.t < ch.scatterAt) {
-            ch.img.setPosition(ch.ox, ch.oy);
-            ch.img.setAlpha(1).setVisible(true);
-          } else if (progress.t < ch.dissolveAt) {
-            const k = (progress.t - ch.scatterAt) / (ch.dissolveAt - ch.scatterAt);
-            const e = k * k;
-            ch.img.setPosition(ch.ox + ch.dx * e, ch.oy + ch.dy * e);
-            ch.img.setAlpha(1 - e * 0.4).setVisible(true);
-          } else {
-            const d = progress.t - ch.dissolveAt;
-            ch.img.setVisible(d < 0.06 && Math.random() > 0.5);
-          }
-        }
-      },
-      onComplete: () => {
-        for (const ch of chunks) {
-          ch.img.destroy();
-          this.textures.remove(ch.texKey);
-        }
-        if (onDone) onDone();
-      },
-    });
-    // Delete animations don't affect game timing; keep playing during dialogue.
-    tw._noPause = true;
-  }
-
-  playTeleportFrames(sprite, direction, onDone) {
-    const STRIPS = 40;
-    const FRAME_MS = 6;
-    const JITTER = [4, 10, 18];      // vertical jitter px, grows per frame
-    const HIDE = [0.25, 0.5, 0.75];  // fraction of strips erased per frame
-
-    const frame = sprite.frame;
-    const fw = frame.width, fh = frame.height;
-    const sw = fw / STRIPS;
-    const scale = sprite.scaleX;
-    const ox = sprite.x, oy = sprite.y;
-    const key = sprite.texture.key;
-    const frameName = frame.name;
-
-    sprite.setVisible(false);
-
-    // slice the current frame into vertical strips, aligned 1:1 over the sprite
-    const objs = [];
-    for (let i = 0; i < STRIPS; i++) {
-      const img = this.add.image(ox, oy, key, frameName);
-      img.setOrigin(0.5, 1).setScale(scale).setDepth(sprite.depth + 1);
-      img.setCrop(i * sw, 0, sw, fh);
-      objs.push(img);
-    }
-
-    // precompute the 3 frames: cumulative erase + growing jitter
-    const frames = [];
-    const hidden = new Set();
-    for (let f = 0; f < 3; f++) {
-      while (hidden.size < Math.floor(STRIPS * HIDE[f])) {
-        hidden.add((Math.random() * STRIPS) | 0);
-      }
-      const st = [];
-      for (let i = 0; i < STRIPS; i++) {
-        st.push({ visible: !hidden.has(i), yOff: (Math.random() * 2 - 1) * JITTER[f] });
-      }
-      frames.push(st);
-    }
-    const order = direction === 'out' ? [0, 1, 2] : [2, 1, 0];
-
-    let step = 0;
-    const tick = () => {
-      // abort if the sprite died mid-teleport (damageEnemy clears the flag)
-      if (!sprite.getData('teleporting')) {
-        objs.forEach((o) => { if (o.active) o.destroy(); });
-        return;
-      }
-      if (step < order.length) {
-        const st = frames[order[step]];
-        for (let i = 0; i < STRIPS; i++) {
-          objs[i].setVisible(st[i].visible);
-          objs[i].setY(oy + st[i].yOff);
-        }
-        step++;
-        this.time.delayedCall(FRAME_MS, tick);
-      } else {
-        objs.forEach((o) => o.destroy());
-        if (direction === 'in') sprite.setVisible(true);
-        onDone();
-      }
-    };
-    // store strips so damageEnemy can clean them up if the sprite dies
-    sprite.setData('teleportObjs', objs);
-    tick();
-  }
 
   // ================= grid + HUD =================
 
@@ -888,15 +379,6 @@ export default class BattleScene extends Phaser.Scene {
 
   // Translucent perspective highlight over a tile (telegraphs, sword arc).
   // Floor-level: always below the characters.
-  highlightTile(c, r, color, alpha = 0.4) {
-    const g = this.add.graphics().setDepth(5);
-    const [tl, tr, br, bl] = tileCorners(c, r);
-    g.fillStyle(color, alpha);
-    g.fillPoints([tl, tr, br, bl], true);
-    g.lineStyle(3, color, 1);
-    g.strokePoints([tl, tr, br, bl, tl].map((p) => new Phaser.Geom.Point(p.x, p.y)), true);
-    return g;
-  }
 
   drawGrid() {
     const g = this.add.graphics().setDepth(-5);
@@ -1083,356 +565,32 @@ export default class BattleScene extends Phaser.Scene {
 
   // ================= navi =================
 
-  handleMovement(time) {
-    if (this.navi.getData('teleporting')) return;
-    if (this._lastMove && time - this._lastMove < 160) return;
-    const { col, row } = this.naviPos;
-    let nc = col, nr = row;
-    if (Phaser.Input.Keyboard.JustDown(this.cursors.left)) nc--;
-    else if (Phaser.Input.Keyboard.JustDown(this.cursors.right)) nc++;
-    else if (Phaser.Input.Keyboard.JustDown(this.cursors.up)) nr--;
-    else if (Phaser.Input.Keyboard.JustDown(this.cursors.down)) nr++;
-    else return;
 
-    nc = Phaser.Math.Clamp(nc, 0, 2);
-    nr = Phaser.Math.Clamp(nr, 0, ROWS - 1);
-    if (nc !== col || nr !== row) {
-      this.naviPos = { col: nc, row: nr };
-      this._lastMove = time;
-      this.teleportMove(this.navi, nc, nr, NAVI_MANUAL);
-    }
-  }
-
-  handleChips(time) {
-    // X: buster shoot (hitscan). Z/Space: use the front chip. 1-4: chips out of order.
-    if (Phaser.Input.Keyboard.JustDown(this.shootKey)) this.fireShoot(time);
-    // Rapid fire: keep firing while the key is held (started via JustDown below).
-    // Uses the scene clock for timing to avoid stale `time` params.
-    if (this.rapidFiring) {
-      const { slot, key } = this.rapidFiring;
-      if (!key.isDown || this.loadout[slot] !== 'rapid') {
-        this.rapidFiring = null; // key released or chip gone
-      } else if (this.time.now >= this.rapidNextShot) {
-        this.fireRapidShot(slot);
-      }
-    }
-    const frontDown = Phaser.Input.Keyboard.JustDown(this.chipFrontKey);
-    const front2Down = Phaser.Input.Keyboard.JustDown(this.chipFrontKey2);
-    if (frontDown || front2Down) {
-      this.pressChipKey(0, frontDown ? this.chipFrontKey : this.chipFrontKey2);
-    }
-    const keyMap = [this.keys.ONE, this.keys.TWO, this.keys.THREE, this.keys.FOUR];
-    keyMap.forEach((key, i) => {
-      if (Phaser.Input.Keyboard.JustDown(key)) this.pressChipKey(i, key);
-    });
-  }
 
   // Called on JustDown of a chip key. Rapid fire starts a hold-to-fire;
   // other chips fire once via fireChipAt. Front key (Z/Space) with an empty
   // slot falls back to the buster.
-  pressChipKey(i, key) {
-    const chipId = this.loadout[i];
-    if (!chipId) {
-      if (i === 0) this.fireShoot(this.time.now); // out of chips: buster
-      return;
-    }
-    if (chipId === 'rapid') {
-      // don't restart if already firing this slot (e.g. pressing 1 while holding Z)
-      if (this.rapidFiring && this.rapidFiring.slot === i) return;
-      this.startRapidFire(i, key);
-    } else {
-      this.fireChipAt(i, this.time.now);
-    }
-  }
 
-  startRapidFire(slot, key) {
-    if (this.chipAmmo[slot] == null) {
-      this.chipAmmo[slot] = CHIP_MAP.rapid.shots; // 10
-    }
-    this.rapidFiring = { slot, key };
-    this.fireRapidShot(slot);
-  }
 
-  fireRapidShot(slot) {
-    const chip = CHIP_MAP.rapid;
-    // hitscan like the buster: instant beam, hits first enemy ahead on the row
-    const row = this.naviPos.row;
-    const s = this.navi.scaleX;
-    const mx = this.navi.x + 45 * s, my = this.navi.y - 115 * s;
-    this.showMuzzleFlash(mx, my, row);
-    let target = null, targetCol = 99;
-    for (const e of this.enemies) {
-      if (!e.alive) continue;
-      if (e.type === 'rootabreak' && e.state === 'planted') continue;
-      if (e.row === row && e.col > this.naviPos.col && e.col < targetCol) {
-        target = e; targetCol = e.col;
-      }
-    }
-    const endX = target ? tileCenter(targetCol, row).x : 930;
-    const beam = this.add.line(0, 0, mx, my, endX, my, chip.color).setOrigin(0, 0);
-    beam.setLineWidth(2).setAlpha(0.8);
-    beam.setDepth(10 + row);
-    this.tweens.add({ targets: beam, alpha: 0, duration: 90, onComplete: () => beam.destroy() });
-    if (target) { this.damageEnemy(target, chip.damage); this.flash(target.sprite, chip.color); }
-
-    this.chipAmmo[slot]--;
-    this.rapidNextShot = this.time.now + (chip.fireIntervalMs ?? 130);
-
-    if (this.chipAmmo[slot] <= 0) {
-      // out of ammo: remove the chip, slide the rest left
-      this.rapidFiring = null;
-      this.removeChipFromLoadout(slot);
-    } else {
-      this.updateLoadoutHud();
-    }
-  }
 
   // Remove chip at index i from the loadout (used up): splice, HUD, slide anim.
-  removeChipFromLoadout(i) {
-    this.loadout.splice(i, 1);
-    this.chipAmmo.splice(i, 1);
-    this.chipAmmo.push(null); // keep length 4
-    // fix rapidFiring slot if it was after the removed chip
-    if (this.rapidFiring && this.rapidFiring.slot > i) {
-      this.rapidFiring.slot--;
-    }
-    this.updateLoadoutHud();
-    this.chipIcons.forEach(({ frame, icon, ammo }, s) => {
-      this.tweens.killTweensOf([frame, icon, ammo]);
-      const targetX = 420 + s * 70;
-      if (s >= i && this.loadout[s]) {
-        frame.x = targetX + 70; icon.x = targetX + 70; ammo.x = targetX + 70 + 16;
-        this.tweens.add({ targets: [frame, icon], x: targetX, duration: 160, ease: 'Quad.easeOut' });
-        this.tweens.add({ targets: ammo, x: targetX + 16, duration: 160, ease: 'Quad.easeOut' });
-      } else {
-        frame.x = targetX; icon.x = targetX; ammo.x = targetX + 16;
-      }
-    });
-  }
 
   // Use the chip at loadout index i (single use): it disappears and the
   // chips to its right tween left to fill the hole.
-  fireChipAt(i, time) {
-    const chipId = this.loadout[i];
-    if (!chipId) return;
-    this.fireChip(CHIP_MAP[chipId], time);
-    this.removeChipFromLoadout(i);
-  }
 
   // Buster: instant hitscan down the navi's row — no projectile. Hits the
   // first enemy ahead; shows the punch frame + a muzzle flash.
-  fireShoot(time) {
-    if (time < this.shootReadyAt) return;
-    this.shootReadyAt = time + 150;
-    this.showPunchFrame();
-    const row = this.naviPos.row;
-    const s = this.navi.scaleX;
-    const mx = this.navi.x + 45 * s, my = this.navi.y - 115 * s;
-    this.showMuzzleFlash(mx, my, row);
-    // first alive enemy ahead on the navi's row (any type)
-    let target = null, targetCol = 99;
-    for (const e of this.enemies) {
-      if (!e.alive) continue;
-      if (e.type === 'rootabreak' && e.state === 'planted') continue;
-      if (e.row === row && e.col > this.naviPos.col && e.col < targetCol) {
-        target = e; targetCol = e.col;
-      }
-    }
-    const endX = target ? tileCenter(targetCol, row).x : 930;
-    // NB: Line geometry renders minus the display origin, so setOrigin(0, 0)
-    // or the beam centers on the wrong point.
-    const beam = this.add.line(0, 0, mx, my, endX, my, 0xfff176).setOrigin(0, 0);
-    beam.setLineWidth(3).setAlpha(0.9);
-    beam.setDepth(10 + row); // row-ordered like the other battle effects
-    this.tweens.add({ targets: beam, alpha: 0, duration: 110, onComplete: () => beam.destroy() });
-    if (target) { this.damageEnemy(target, 5); this.flash(target.sprite, 0xfff176); }
-  }
 
   // Punch frame for the buster. Mel is drawing the real punch frame +
   // muzzle flash herself; until 'bugchan-punch' lands in sprites/, the
   // fallback is a quick lunge. (Wire the preload in preload() when it lands.)
-  showPunchFrame() {
-    if (this._punchT) return;
-    const hasPunch = this.textures.exists('bugchan-punch');
-    if (hasPunch) {
-      this.navi.anims.pause();
-      this.navi.setTexture('bugchan-punch');
-    } else {
-      this.tweens.add({ targets: this.navi, x: this.navi.x + 8, duration: 60, yoyo: true });
-    }
-    this._punchT = this.time.delayedCall(130, () => {
-      this._punchT = null;
-      if (hasPunch) {
-        this.navi.setTexture('bugchan');
-        this.navi.play('bugchan-idle');
-      }
-    });
-  }
 
   // PLACEHOLDER for Mel's muzzle-flash overlay: procedural star flash.
-  showMuzzleFlash(x, y, row) {
-    const g = this.add.graphics().setDepth(10 + row); // row-ordered
-    const pts = [];
-    for (let k = 0; k < 16; k++) {
-      const r = k % 2 === 0 ? 26 : 10;
-      const a = (k / 16) * Math.PI * 2;
-      pts.push(new Phaser.Geom.Point(Math.cos(a) * r, Math.sin(a) * r));
-    }
-    g.fillStyle(0xfff176, 1);
-    g.fillPoints(pts, true);
-    g.fillStyle(0xffffff, 1);
-    g.fillCircle(0, 0, 8);
-    g.setPosition(x, y);
-    this.tweens.add({ targets: g, alpha: 0, scale: 1.6, duration: 90, onComplete: () => g.destroy() });
-  }
 
-  fireChip(chip, time) {
-    const feet = tileFeet(this.naviPos.col, this.naviPos.row);
-
-    if (chip.id === 'recover') {
-      this.naviHp = Math.min(this.naviMaxHp, this.naviHp + 60);
-      this.flash(this.navi, 0x81c784);
-      return;
-    }
-
-    if (chip.id === 'sword') {
-      const target = { col: this.naviPos.col + 1, row: this.naviPos.row };
-      for (const e of this.enemies) {
-        if (!e.alive) continue;
-        if (e.type === 'rootabreak' && e.state === 'planted') continue;
-        if (target.col === e.col && target.row === e.row) {
-          this.damageEnemy(e, chip.damage);
-        }
-      }
-      // sword arc flash on the target tile
-      const arc = this.highlightTile(target.col, target.row, chip.color, 0.35);
-      this.time.delayedCall(140, () => arc.destroy());
-      return;
-    }
-
-    if (chip.id === 'bomb') {
-      // Lob a bomb 3 tiles ahead; explodes in a plus shape (like the spider's)
-      const targetCol = Math.min(COLS - 1, this.naviPos.col + 3);
-      const targetRow = this.naviPos.row;
-      // red warning telegraphs on the affected tiles
-      const warns = [];
-      const tiles = [[targetCol, targetRow],
-        [targetCol - 1, targetRow], [targetCol + 1, targetRow],
-        [targetCol, targetRow - 1], [targetCol, targetRow + 1]];
-      for (const [c, r] of tiles) {
-        if (c >= 0 && c < COLS && r >= 0 && r < ROWS) {
-          warns.push(this.highlightTile(c, r, 0xff3b30, 0.35));
-        }
-      }
-      const startX = feet.x + 30, startY = feet.y - 90;
-      const end = tileFeet(targetCol, targetRow);
-      const bomb = this.add.sprite(startX, startY, 'bug-bomb');
-      bomb.play('bug-bomb-fuse');
-      bomb.setScale(this.navi.scaleX * 0.9);
-      bomb.setDepth(20);
-      const proxy = { t: 0 };
-      const arcH = 190;
-      this.tweens.add({
-        targets: proxy, t: 1, duration: 1050, ease: 'Linear',
-        onUpdate: () => {
-          const t = proxy.t;
-          const x = startX + (end.x - startX) * t;
-          const y = startY + (end.y - startY) * t - Math.sin(t * Math.PI) * arcH;
-          bomb.setPosition(x, y);
-          bomb.angle += 5;
-        },
-        onComplete: () => {
-          bomb.destroy();
-          warns.forEach((w) => w.destroy());
-          // explosion flash
-          const c = tileCenter(targetCol, targetRow);
-          const boom = this.add.circle(c.x, c.y, 10, 0xff6f00).setDepth(20);
-          this.tweens.add({
-            targets: boom, scaleX: 4, scaleY: 2.5, alpha: 0,
-            duration: 280, ease: 'Quad.easeOut',
-            onComplete: () => boom.destroy(),
-          });
-          // damage enemies on the landing tile + orthogonal adjacent
-          for (const e of this.enemies) {
-            if (!e.alive) continue;
-            if (e.type === 'rootabreak' && e.state === 'planted') continue;
-            const manhattan = Math.abs(e.col - targetCol) + Math.abs(e.row - targetRow);
-            if (manhattan <= 1) {
-              this.damageEnemy(e, chip.damage);
-              this.flash(e.sprite, chip.color);
-            }
-          }
-        },
-      });
-      return;
-    }
-
-    if (chip.id === 'railgun') {
-      // Instant hitscan that pierces: hits ALL enemies on the navi's row.
-      const row = this.naviPos.row;
-      const s = this.navi.scaleX;
-      const mx = this.navi.x + 45 * s, my = this.navi.y - 115 * s;
-      // beam across the full row
-      const beam = this.add.line(0, 0, mx, my, 930, my, 0x00e5ff).setOrigin(0, 0);
-      beam.setLineWidth(5).setAlpha(0.95);
-      beam.setDepth(10 + row);
-      this.tweens.add({ targets: beam, alpha: 0, duration: 140, onComplete: () => beam.destroy() });
-      // damage every hittable enemy ahead on the row (pierce, no early stop)
-      for (const e of this.enemies) {
-        if (!e.alive) continue;
-        if (e.type === 'rootabreak' && e.state === 'planted') continue;
-        if (e.row === row && e.col > this.naviPos.col) {
-          this.damageEnemy(e, chip.damage);
-          this.flash(e.sprite, chip.color);
-        }
-      }
-      return;
-    }
-
-    const rows = chip.id === 'spread'
-      ? [this.naviPos.row - 1, this.naviPos.row, this.naviPos.row + 1].filter((r) => r >= 0 && r < ROWS)
-      : [this.naviPos.row];
-    rows.forEach((r) => {
-      // Spread: the center bullet fires from in front; the side bullets
-      // come from Bugchan's side (her x) on the rows above/below.
-      const startX = (chip.id === 'spread' && r !== this.naviPos.row) ? feet.x : feet.x + 30;
-      const proj = this.add.circle(startX, tileCenter(0, r).y, 10, chip.color);
-      proj.setDepth(10 + r); // row-ordered like other effects
-      proj.setData('damage', chip.damage);
-      proj.setData('row', r);
-      proj.setData('vx', 520);
-      this.projectiles.add(proj);
-    });
-  }
 
   // Tile-based projectile collision (not sprite boxes): a projectile hits
   // only if it's on the enemy's row and overlapping the enemy's tile.
-  projOverlapsTile(proj, col, row) {
-    if (proj.getData('row') !== row) return false;
-    const corners = tileCorners(col, row);
-    const xs = corners.map((p) => p.x);
-    const leftX = Math.min(...xs), rightX = Math.max(...xs);
-    const px = proj.x, rad = 10;
-    return px + rad >= leftX && px - rad <= rightX;
-  }
 
-  updateProjectiles(delta) {
-    const dt = delta / 1000;
-    for (const proj of [...this.projectiles.getChildren()]) {
-      if (!proj.active) continue;
-      proj.x += proj.getData('vx') * dt;
-      if (proj.x > 1020) { proj.destroy(); continue; }
-      for (const e of this.enemies) {
-        if (!e.alive) continue;
-        if (e.type === 'rootabreak' && e.state === 'planted') continue;
-        if (this.projOverlapsTile(proj, e.col, e.row)) {
-          this.damageEnemy(e, proj.getData('damage'));
-          proj.destroy();
-          break;
-        }
-      }
-    }
-  }
 
   // ================= enemy AI =================
 
@@ -1495,17 +653,6 @@ export default class BattleScene extends Phaser.Scene {
 
   // ================= damage =================
 
-  flash(target, color) {
-    target.setTintFill(color);
-    // Use a tween (not delayedCall) so the flash isn't frozen by time.paused.
-    // Marked _noPause so it continues during dialogue.
-    const tw = this.tweens.add({
-      targets: {},
-      duration: 120,
-      onComplete: () => { if (target.active) target.clearTint(); },
-    });
-    tw._noPause = true;
-  }
 
   damageEnemy(e, amount) {
     if (!e.alive) return;
@@ -1698,3 +845,6 @@ Object.assign(BattleScene.prototype, SentryMethods);
 Object.assign(BattleScene.prototype, BombSpiderMethods);
 Object.assign(BattleScene.prototype, RootabreakMethods);
 Object.assign(BattleScene.prototype, PumpkinMethods);
+Object.assign(BattleScene.prototype, EffectsMethods);
+Object.assign(BattleScene.prototype, CustomScreenMethods);
+Object.assign(BattleScene.prototype, NaviMethods);
