@@ -60,7 +60,7 @@ export const BATTLES = [
     ],
   },
   {
-    name: 'SPROUT PATROL',
+    name: 'ROOT CELLAR',
     enemies: [
       { type: 'rootabreak', col: 4, row: 0 },
       { type: 'rootabreak', col: 4, row: 2 },
@@ -79,19 +79,40 @@ export const BATTLES = [
     ],
   },
   {
-    name: 'ROOT CELLAR',
+    name: 'OVERGROWTH',
     enemies: [
-      { type: 'rootabreak', col: 3, row: 0 },
-      { type: 'rootabreak', col: 5, row: 1, big: true },
-      { type: 'rootabreak', col: 3, row: 2 },
+      { type: 'sentry', col: 5, row: 0 },           // top right
+      { type: 'sentry', col: 5, row: 2 },           // bottom right
+      { type: 'skitterbug-green', col: 3, row: 0 },  // top left (fast)
+      { type: 'skitterbug-green', col: 4, row: 2 },  // middle bottom (fast)
     ],
     intro: [
-      { speaker: 'mel', text: 'Three this time. The big one in the middle looks mean.' },
-      { speaker: 'bugchan', text: 'Big root, big problems! Chips ready, Mel!' },
+      { speaker: 'mel', text: 'Turrets on the right, and those beetles look... greener? Faster?' },
+      { speaker: 'bugchan', text: 'Green means go! I will debug them anyway!' },
+      { speaker: 'sentry', text: 'TARGET ACQUIRED.' },
+    ],
+    victory: [
+      { speaker: 'bugchan', text: 'Fast or not, they are squashed!' },
+    ],
+    story: [
+      { speaker: 'mel', text: 'The roots are getting tangled with something else...' },
+      { speaker: 'bugchan', text: 'Tangled? Like my cables after a long night!' },
+    ],
+  },
+  {
+    name: 'ROOT NEST',
+    enemies: [
+      { type: 'rootabreak', col: 3, row: 0 },  // top left
+      { type: 'bombspider', col: 4, row: 1 },  // middle
+      { type: 'rootabreak', col: 5, row: 2 },  // bottom right
+    ],
+    intro: [
+      { speaker: 'mel', text: 'Roots and a bomb spider? This nest is a mess.' },
+      { speaker: 'bugchan', text: 'Messy nest, clean debug! Chips ready!' },
       { speaker: 'rootabreak', text: 'KYAAAH!!' },
     ],
     victory: [
-      { speaker: 'bugchan', text: 'Phew! The big one almost got me!' },
+      { speaker: 'bugchan', text: 'Nest cleared! No more ticking!' },
     ],
     story: [
       { speaker: 'mel', text: 'One signal left. It is huge. Be careful, Bugchan.' },

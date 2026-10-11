@@ -12,6 +12,13 @@ export const SKITTER = {
   manualScale: 1,
 };
 
+export const SKITTER_GREEN = {
+  ...SKITTER,
+  id: 'skitterbug-green',
+  name: 'SKITTERBUG-G',
+  checkIntervalMs: 1400,  // twice as fast as normal
+};
+
 export const SENTRY = {
   id: 'sentry',
   name: 'SENTRY',

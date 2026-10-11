@@ -59,6 +59,7 @@ export default class BattleScene extends Phaser.Scene {
     this.load.image('rootabreak', 'assets/sprites/viruses/rootabreak.png');
     this.load.image('rootabreak-sprout', 'assets/sprites/viruses/rootabreak sprout.png');
     this.load.image('skitterbug', 'assets/sprites/viruses/virus-skitterbug.png');
+    this.load.image('skitterbug-green', 'assets/sprites/viruses/virus-skitterbug-green.png');
     this.load.image('sentry', 'assets/sprites/viruses/virus-sentry-clean.png');
     this.load.image('bomb-spider', 'assets/sprites/viruses/bomb spider.png');
     this.load.spritesheet('bomb', 'assets/sprites/viruses/bomb.png', { frameWidth: 64, frameHeight: 64 });
@@ -166,6 +167,7 @@ export default class BattleScene extends Phaser.Scene {
       if (e.type === 'pumpkin') this.spawnPumpkin(e.col, e.row);
       else if (e.type === 'rootabreak') this.spawnRootabreak(e.col, e.row, e.big);
       else if (e.type === 'skitterbug') this.spawnSkitterbug(e.col, e.row);
+      else if (e.type === 'skitterbug-green') this.spawnSkitterbug(e.col, e.row, true);
       else if (e.type === 'sentry') this.spawnSentry(e.col, e.row);
       else if (e.type === 'bombspider') this.spawnBombSpider(e.col, e.row);
     }

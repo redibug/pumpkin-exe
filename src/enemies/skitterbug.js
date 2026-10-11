@@ -2,20 +2,22 @@
 // Methods are mixed into BattleScene via Object.assign, so `this` is the scene.
 import Phaser from 'phaser';
 import { COLS, ROWS, project, tileCorners, tileFeet, tileCenter } from '../systems/grid.js';
-import { SKITTER, SENTRY, BOMB_SPIDER, ROOTABREAK, AUTOSCALE } from '../data/viruses.js';
+import { SKITTER, SKITTER_GREEN, SENTRY, BOMB_SPIDER, ROOTABREAK, AUTOSCALE } from '../data/viruses.js';
 import { FIT_MAX } from '../systems/spriteFit.js';
 import { SCRIPTS } from '../systems/dialogue.js';
 import { sound } from '../systems/sound.js';
 
 export const SkitterbugMethods = {
-  spawnSkitterbug(col, row) {
-    const sprite = this.physics.add.sprite(0, 0, 'skitterbug');
+  spawnSkitterbug(col, row, green = false) {
+    const cfg = green ? SKITTER_GREEN : SKITTER;
+    const sprite = this.physics.add.sprite(0, 0, green ? 'skitterbug-green' : 'skitterbug');
     sprite.setData('fitMax', AUTOSCALE.skitterbug ?? FIT_MAX);
     sprite.setOrigin(0.5, 1);
     this.placeFighter(sprite, col, row, SKITTER.manualScale);
     const enemy = {
       type: 'skitterbug', sprite, col, row,
-      hp: SKITTER.maxHp, maxHp: SKITTER.maxHp, alive: true,
+      hp: cfg.maxHp, maxHp: cfg.maxHp, alive: true,
+      cfg, // SKITTER or SKITTER_GREEN (for checkIntervalMs)
       nextCheck: 0,
       moveIntent: Math.random() < 0.5 ? -1 : 1, // -1 = up, 1 = down
       canSpit: false, // starts with a move (move, spit, move, spit...)
@@ -50,7 +52,7 @@ export const SkitterbugMethods = {
   },
   skitterbugAI(e, time) {
     if (time < e.nextCheck) return;
-    e.nextCheck = time + SKITTER.checkIntervalMs;
+    e.nextCheck = time + e.cfg.checkIntervalMs;
 
     if (e.canSpit && this.naviPos.row === e.row) {
       this.spitIchor(e);
