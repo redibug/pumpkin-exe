@@ -68,8 +68,7 @@ export const BATTLES = [
     ],
     intro: [
       { speaker: 'bugchan', text: 'Where is the virus? I only see turnips.' },
-      { speaker: 'mel', text: 'Actually, I think they are rutabagas.' },
-      { speaker: 'mel', text: 'They hide underground, then jump out screaming.' },
+      { speaker: 'mel', text: 'Actually, I think they are rutabagas. They hide underground, then jump out screaming.' },
       { speaker: 'bugchan', text: 'Rutabagas?! I will debug these roots!' },
       { speaker: 'rootabreak', text: 'KYAAAH!!' },
     ],
@@ -82,7 +81,7 @@ export const BATTLES = [
     ],
   },
   {
-    name: 'OVERGROWTH',
+    name: 'SECURITY CHECKPOINT',
     enemies: [
       { type: 'sentry', col: 5, row: 0 },           // top right
       { type: 'sentry', col: 5, row: 2 },           // bottom right
@@ -90,7 +89,7 @@ export const BATTLES = [
       { type: 'skitterbug-green', col: 4, row: 2 },  // middle bottom (fast)
     ],
     intro: [
-      { speaker: 'mel', text: 'Turrets wrapped in vines, and green beetles. They are faster than normal.' },
+      { speaker: 'mel', text: 'Watch out, turrets guard the top and bottom row. And the skitterbugs here are faster than normal.' },
       { speaker: 'bugchan', text: 'Fast and green! I will still squash them!' },
       { speaker: 'sentry', text: 'TARGET ACQUIRED.' },
     ],
