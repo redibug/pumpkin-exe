@@ -392,16 +392,19 @@ export default class BattleScene extends Phaser.Scene {
 
   spawnRootabreak(col, row, big = false) {
     const mp = tileFeet(col, row);
+    const mc = tileCenter(col, row);
     // planted: sprout visible, main sprite hidden
-    // sprout origin (0.5, 1): bottom sits at the feet line
-    const sprout = this.add.image(mp.x, mp.y, 'rootabreak-sprout');
-    sprout.setOrigin(0.5, 1);
+    // centered on the tile (it's rooted, not standing)
+    const sprout = this.add.image(mc.x, mc.y, 'rootabreak-sprout');
+    sprout.setOrigin(0.5, 0.5);
     sprout.setScale(mp.s * 0.9).setDepth(9 + row);
-    const sprite = this.physics.add.sprite(mp.x, mp.y, 'rootabreak').setVisible(false);
+    const sprite = this.physics.add.sprite(mc.x, mc.y, 'rootabreak').setVisible(false);
     sprite.setData('fitMax', AUTOSCALE.rootabreak ?? FIT_MAX);
-    sprite.setOrigin(0.5, 1); // standard grounded origin
+    sprite.setOrigin(0.5, 0.5); // centered on the tile
     if (big) sprite.setTint(0xffab91); // big one: slightly red tint
     this.placeFighter(sprite, col, row, MANDRAKE_MANUAL * (big ? 1.35 : 1));
+    // override placeFighter's feet positioning: center on the tile
+    sprite.setPosition(mc.x, mc.y);
     // store the home position for the leap (sprite returns here)
     const homeY = sprite.y;
     const maxHp = big ? M.maxHp * 2 : M.maxHp;
@@ -1237,8 +1240,9 @@ export default class BattleScene extends Phaser.Scene {
       if (e.type === 'rootabreak' && !e.sprite.visible) continue;
       this.placeFighter(e.sprite, e.col, e.row, manual);
       if (e.type === 'rootabreak') {
+        const mc = tileCenter(e.col, e.row);
         const mp = tileFeet(e.col, e.row);
-        e.sprout.setPosition(mp.x, mp.y).setScale(mp.s * 0.9).setDepth(9 + e.row);
+        e.sprout.setPosition(mc.x, mc.y).setScale(mp.s * 0.9).setDepth(9 + e.row);
       }
     }
   }
@@ -1818,6 +1822,9 @@ export default class BattleScene extends Phaser.Scene {
     md.sprite.setVisible(true);
     const manual = MANDRAKE_MANUAL * (md.big ? 1.35 : 1);
     this.placeFighter(md.sprite, md.col, md.row, manual);
+    // center on the tile (not feet)
+    const mc = tileCenter(md.col, md.row);
+    md.sprite.setPosition(mc.x, mc.y);
     const airHomeY = md.sprite.y;
     // pop-in scale
     const targetScale = md.sprite.scaleX;
