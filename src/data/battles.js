@@ -92,6 +92,7 @@ export const BATTLES = [
       { speaker: 'mel', text: 'Watch out, turrets guard the top and bottom row. And the skitterbugs here are faster than normal.' },
       { speaker: 'bugchan', text: 'Fast and green! I will still squash them!' },
       { speaker: 'sentry', text: 'TARGET ACQUIRED.' },
+      { speaker: 'skitterbug', text: 'SKITTER SKITTER!' },
     ],
     victory: [
       { speaker: 'bugchan', text: 'Fast or not, they are squashed!' },
