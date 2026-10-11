@@ -1267,6 +1267,8 @@ export default class BattleScene extends Phaser.Scene {
   drawHud() {
     this.add.rectangle(120, 500, 220, 18, 0x101828).setOrigin(0, 0.5);
     this.hpBar = this.add.rectangle(122, 500, 216, 14, 0x4fc3f7).setOrigin(0, 0.5);
+    // init to carried HP (not full) — updateHud doesn't run while custom screen is open
+    this.hpBar.setDisplaySize(216 * (this.naviHp / this.naviMaxHp), 14);
     this.add.text(20, 490, 'NAVI', { fontFamily: 'monospace', fontSize: '16px', color: '#e8f6ff' });
 
     // custom gauge under the HP bar
