@@ -1843,14 +1843,14 @@ export default class BattleScene extends Phaser.Scene {
         // (from the sprite's air position, not the ground)
         md.state = 'screaming';
         const sx = md.sprite.x, sy = md.sprite.y;
-        md.screamText = this.add.text(sx, sy - 60, 'KYAAH!', {
+        md.screamText = this.add.text(sx, sy - 60, 'KYAAAH!!', {
           fontFamily: 'monospace', fontSize: '22px', color: '#ce93d8',
           stroke: '#2a0a2a', strokeThickness: 4,
         }).setOrigin(0.5).setDepth(10 + md.row);
         // float up slowly and fade out (longer-lived)
         this.tweens.add({
-          targets: md.screamText, y: sy - 130, alpha: 0,
-          duration: 1800, ease: 'Quad.easeOut',
+          targets: md.screamText, y: sy - 70, alpha: 0,
+          duration: 1800*2, ease: 'Quad.easeOut',
           onComplete: () => {
             if (md.screamText) { md.screamText.destroy(); md.screamText = null; }
           },
