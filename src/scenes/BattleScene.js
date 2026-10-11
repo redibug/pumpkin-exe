@@ -23,7 +23,7 @@ const SKITTER = {
 const SKITTER_MANUAL = 1;
 
 const SENTRY = {
-  maxHp: 80,
+  maxHp: 200,
   telegraphMs: 800,       // activated: sensor flashes red for slightly < 1s
   cooldownMs: 1000,       // cooldown: can't do anything for 1s
   laserDamage: 15,
@@ -31,8 +31,8 @@ const SENTRY = {
 const SENTRY_MANUAL = 3;
 
 const BOMB_SPIDER = {
-  maxHp: 70,
-  moveIntervalMs: 2600,   // cycle: move -> move -> throw -> repeat
+  maxHp: 140,
+  moveIntervalMs: 1600,   // cycle: move -> move -> throw -> repeat
   bombDamage: 20,
   throwDistance: 3,       // tiles forward (toward the player)
 };
@@ -1886,7 +1886,7 @@ export default class BattleScene extends Phaser.Scene {
     // Cycle: move -> move -> throw -> repeat
     if (time >= e.nextMove) {
       e.nextMove = time + BOMB_SPIDER.moveIntervalMs;
-      if (e.movesDone >= 2) {
+      if (e.movesDone >= 3) {
         // time to throw (if carrying the bomb)
         if (e.hasBomb) {
           this.throwBomb(e);
