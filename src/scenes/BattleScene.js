@@ -175,34 +175,38 @@ export default class BattleScene extends Phaser.Scene {
     // NB: enemy AI timers are armed when the intro dialogue finishes, so
     // the battle doesn't run during the cutscene.
 
-    // ---- debug overlay (TEMPORARY): live perspective tuning ----
-    this.debugOverlay = createDebugOverlay({
-      getValues: getGridParams,
-      onChange: (key, value) => {
-        setGridParams({ [key]: value });
-        this.redrawGrid();
-      },
-    });
-    document.getElementById('game').appendChild(this.debugOverlay.el);
-    this.debugVisible = true;
-    this.input.keyboard.on('keydown-D', () => {
-      this.debugVisible = !this.debugVisible;
-      this.debugOverlay.setVisible(this.debugVisible);
-      if (this.debugVisible) this.debugOverlay.refresh();
-    });
+    // ---- debug overlay: only with ?debug=true in URL ----
+    const debugMode = new URLSearchParams(window.location.search).get('debug') === 'true';
+    this.debugMode = debugMode;
+    if (debugMode) {
+      this.debugOverlay = createDebugOverlay({
+        getValues: getGridParams,
+        onChange: (key, value) => {
+          setGridParams({ [key]: value });
+          this.redrawGrid();
+        },
+      });
+      document.getElementById('game').appendChild(this.debugOverlay.el);
+      this.debugVisible = true;
+      this.input.keyboard.on('keydown-D', () => {
+        this.debugVisible = !this.debugVisible;
+        this.debugOverlay.setVisible(this.debugVisible);
+        if (this.debugVisible) this.debugOverlay.refresh();
+      });
 
-    // ---- gameplay debug panel (TEMPORARY: hide before shipping) ----
-    // G toggles it. Skip-dialogue is local-only (localStorage, never in repo).
-    this.debugGameplay = createDebugGameplay({
-      onSkipBattle: () => this.debugSkipBattle(),
-    });
-    this.debugGameplay.setVisible(true);
-    this.debugGameplayVisible = true;
-    document.getElementById('game').appendChild(this.debugGameplay.el);
-    this.input.keyboard.on('keydown-G', () => {
-      this.debugGameplayVisible = !this.debugGameplayVisible;
-      this.debugGameplay.setVisible(this.debugGameplayVisible);
-    });
+      // ---- gameplay debug panel ----
+      // G toggles it. Skip-dialogue is local-only (localStorage, never in repo).
+      this.debugGameplay = createDebugGameplay({
+        onSkipBattle: () => this.debugSkipBattle(),
+      });
+      this.debugGameplay.setVisible(true);
+      this.debugGameplayVisible = true;
+      document.getElementById('game').appendChild(this.debugGameplay.el);
+      this.input.keyboard.on('keydown-G', () => {
+        this.debugGameplayVisible = !this.debugGameplayVisible;
+        this.debugGameplay.setVisible(this.debugGameplayVisible);
+      });
+    }
 
     // ---- input ----
     this.cursors = this.input.keyboard.createCursorKeys();
