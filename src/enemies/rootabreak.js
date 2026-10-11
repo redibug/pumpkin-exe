@@ -103,9 +103,12 @@ export const RootabreakMethods = {
         if (!md.alive) return;
         // SCREAM at peak: KYAAH! floats up and fades, sound waves out
         // (from the sprite's air position, not the ground)
+        // Offsets scale with displayHeight so they track the head at any distance.
         md.state = 'screaming';
         const sx = md.sprite.x, sy = md.sprite.y;
-        md.screamText = this.add.text(sx, sy - 60, 'KYAAAH!!', {
+        const dh = md.sprite.displayHeight;
+        const textY = sy - 1.05 * dh; // just above the head
+        md.screamText = this.add.text(sx, textY, 'KYAAAH!!', {
           fontFamily: 'monospace', fontSize: '22px', color: '#ce93d8',
           stroke: '#2a0a2a', strokeThickness: 4,
         }).setOrigin(0.5).setDepth(10 + md.row);
@@ -125,7 +128,7 @@ export const RootabreakMethods = {
           },
         });
         this.tweens.add({
-          targets: md.screamText, y: sy - 80, alpha: 0,
+          targets: md.screamText, y: textY - 0.3 * dh, alpha: 0,
           duration: 1800*2, ease: 'Quad.easeOut',
           onComplete: () => {
             if (md.screamText) { md.screamText.destroy(); md.screamText = null; }
@@ -203,7 +206,8 @@ export const RootabreakMethods = {
     // perspective: match the sprite's scale (going forward, all projectiles
     // should inherit perspective from their source)
     const ps = md.sprite.scaleX;
-    g.setPosition(md.sprite.x, md.sprite.y);
+    // spawn at mouth height (upper sprite), scaled by perspective
+    g.setPosition(md.sprite.x, md.sprite.y - 0.5 * md.sprite.displayHeight);
     g.setScale(ps);
     g.setDepth(10 + md.row);
     g.setData('vx', dir * ROOTABREAK.noiseSpeed);
