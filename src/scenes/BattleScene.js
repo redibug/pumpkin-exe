@@ -2116,14 +2116,87 @@ export default class BattleScene extends Phaser.Scene {
     }
   }
 
+  // Fancy title with vertical gradient, stroke, and blurred drop shadow.
+  // Drawn on a canvas for the gradient; returns an Image.
+  makeFancyTitle(x, y, text, gradTop, gradBottom, strokeColor) {
+    const fontSize = 56;
+    const key = `title-${text.replace(/\s/g, '_')}`;
+    // measure text width via a temp canvas
+    const meas = this.textures.createCanvas('__meas', 4, 4);
+    const mctx = meas.getContext();
+    mctx.font = `bold ${fontSize}px monospace`;
+    const tw = Math.ceil(mctx.measureText(text).width);
+    this.textures.remove('__meas');
+    const pad = 24;
+    const cw = tw + pad * 2, ch = fontSize + pad * 2;
+    const tex = this.textures.createCanvas(key, cw, ch);
+    const ctx = tex.getContext();
+    ctx.font = `bold ${fontSize}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const cx = cw / 2, cy = ch / 2;
+    // blurred dark drop shadow (drawn first, offset down)
+    ctx.shadowColor = 'rgba(0,0,0,0.85)';
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 5;
+    // gradient fill
+    const grad = ctx.createLinearGradient(0, cy - fontSize / 2, 0, cy + fontSize / 2);
+    grad.addColorStop(0, gradTop);
+    grad.addColorStop(1, gradBottom);
+    ctx.fillStyle = grad;
+    ctx.fillText(text, cx, cy);
+    // stroke on top (no shadow for the stroke)
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = strokeColor;
+    ctx.strokeText(text, cx, cy);
+    tex.refresh();
+    const img = this.add.image(x, y, key).setDepth(100);
+    return img;
+  }
+
+  // Glitch-in: flicker with x-jitter, then scale down to 1.0
+  glitchIn(title, ...subs) {
+    const baseX = title.x;
+    title.setScale(1.22).setAlpha(0);
+    subs.forEach((s) => s.setAlpha(0));
+    let ticks = 0;
+    this.time.addEvent({
+      delay: 45, repeat: 7,
+      callback: () => {
+        ticks++;
+        title.x = baseX + Phaser.Math.Between(-9, 9);
+        title.setAlpha(Phaser.Math.FloatBetween(0.25, 1));
+        if (ticks >= 7) {
+          title.x = baseX;
+          title.setAlpha(1);
+          this.tweens.add({
+            targets: title, scaleX: 1, scaleY: 1,
+            duration: 220, ease: 'Quad.easeOut',
+          });
+          // fade the subtitles in after the title settles
+          subs.forEach((s, i) => {
+            this.tweens.add({
+              targets: s, alpha: 1,
+              duration: 180, delay: 120 + i * 90,
+            });
+          });
+        }
+      },
+    });
+  }
+
   showGameOver() {
     this.over = true;
-    this.add.text(480, 250, 'GAME OVER', {
-      fontFamily: 'monospace', fontSize: '56px', color: '#ff5252',
-    }).setOrigin(0.5).setDepth(100);
-    this.add.text(480, 320, 'press R to jack in again', {
+    const title = this.makeFancyTitle(480, 250, 'GAME OVER', '#ff8a80', '#d32f2f', '#4a0000');
+    const sub = this.add.text(480, 320, 'press R to jack in again', {
       fontFamily: 'monospace', fontSize: '18px', color: '#9fb3c8',
     }).setOrigin(0.5).setDepth(100);
+    sub.setShadow(0, 3, 'rgba(0,0,0,0.85)', 10, true, true);
+    this.glitchIn(title, sub);
     // R retries the current battle, not the whole run
     this.input.keyboard.once('keydown-R', () => this.scene.restart({ battleIndex: this.battleIndex }));
   }
@@ -2131,16 +2204,17 @@ export default class BattleScene extends Phaser.Scene {
   showVictory() {
     this.over = true;
     const battle = BATTLES[this.battleIndex];
-    this.add.text(480, 250, 'VIRUS DELETED', {
-      fontFamily: 'monospace', fontSize: '56px', color: '#81c784',
-    }).setOrigin(0.5).setDepth(100);
-    this.add.text(480, 320, `${battle.name} busted!`, {
+    const title = this.makeFancyTitle(480, 250, 'VIRUS DELETED', '#c8e6c9', '#2e7d32', '#0a2a0a');
+    const sub1 = this.add.text(480, 320, `${battle.name} busted!`, {
       fontFamily: 'monospace', fontSize: '18px', color: '#9fb3c8',
     }).setOrigin(0.5).setDepth(100);
+    sub1.setShadow(0, 3, 'rgba(0,0,0,0.85)', 10, true, true);
     const isLast = this.battleIndex >= BATTLES.length - 1;
-    this.add.text(480, 360, isLast ? 'thanks for playing! 🎃' : 'press Z to continue', {
+    const sub2 = this.add.text(480, 360, isLast ? 'thanks for playing! 🎃' : 'press Z to continue', {
       fontFamily: 'monospace', fontSize: '18px', color: '#9fb3c8',
     }).setOrigin(0.5).setDepth(100);
+    sub2.setShadow(0, 3, 'rgba(0,0,0,0.85)', 10, true, true);
+    this.glitchIn(title, sub1, sub2);
     if (isLast) return;
     // victory screen -> story segment -> next battle
     const advance = (e) => {
