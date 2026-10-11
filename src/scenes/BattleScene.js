@@ -36,7 +36,7 @@ const BOMB_SPIDER = {
   bombDamage: 20,
   throwDistance: 3,       // tiles forward (toward the player)
 };
-const BOMB_SPIDER_MANUAL = 1;
+const BOMB_SPIDER_MANUAL = 1.25;
 
 // Per-enemy-type auto-scale: longest texture side auto-shrinks to fit.
 // Unlisted types use the default FIT_MAX (512).
@@ -169,7 +169,7 @@ const BATTLES = [
 // Manual artistic scales on top of the auto-fit + perspective scale.
 const NAVI_MANUAL = 1;
 const BOSS_MANUAL = 0.5;
-const MANDRAKE_MANUAL = 0.25;
+const MANDRAKE_MANUAL = 1.25;
 
 // ---- custom screen / deck ----
 const CUSTOM_GAUGE_MS = 10000; // battle time to fill the custom gauge
@@ -203,7 +203,7 @@ export default class BattleScene extends Phaser.Scene {
     this.load.image('tile-enemy', 'assets/tiles/tile-enemy.png');
     this.load.spritesheet('bugchan', 'assets/sprites/bug/bugchan-idle-strip.png', { frameWidth: 112, frameHeight: 224 });
     this.load.image('boss', 'assets/sprites/viruses/boss-v5-cloak.png');
-    this.load.image('mandrake', 'assets/sprites/viruses/virus-rutabaga-mandrake.png');
+    this.load.image('mandrake', 'assets/sprites/viruses/rootabreak.png');
     this.load.image('skitterbug', 'assets/sprites/viruses/virus-skitterbug.png');
     this.load.image('sentry', 'assets/sprites/viruses/virus-sentry-clean.png');
     this.load.image('bomb-spider', 'assets/sprites/viruses/bomb spider.png');
