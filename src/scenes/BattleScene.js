@@ -493,6 +493,27 @@ export default class BattleScene extends Phaser.Scene {
       hasBomb: true, // false while the thrown bomb is in the air
       hpBar: this.makeHpBar(),
     };
+    // Idle: same squash-and-stretch as skitterbug (feet planted, scale only)
+    enemy.baseScaleX = sprite.scaleX;
+    enemy.baseScaleY = sprite.scaleY;
+    enemy.squash = { v: 0 };
+    enemy.bobTween = this.tweens.add({
+      targets: enemy.squash,
+      v: 1,
+      duration: 700 + Math.random() * 300,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+      onUpdate: () => {
+        if (!enemy.alive) return;
+        if (sprite.getData('teleporting')) return;
+        const k = enemy.squash.v;
+        sprite.setScale(
+          enemy.baseScaleX * (1 + 0.04 * k),
+          enemy.baseScaleY * (1 - 0.06 * k)
+        );
+      },
+    });
     this.enemies.push(enemy);
     return enemy;
   }
@@ -1872,6 +1893,9 @@ export default class BattleScene extends Phaser.Scene {
           if (nc !== e.col || nr !== e.row) {
             e.col = nc; e.row = nr;
             this.teleportMove(e.sprite, e.col, e.row, BOMB_SPIDER_MANUAL, () => {
+              // refresh base scale after the move (perspective may differ by row)
+              e.baseScaleX = e.sprite.scaleX;
+              e.baseScaleY = e.sprite.scaleY;
               this.positionBombBack(e);
             });
             this.positionBombBack(e);
