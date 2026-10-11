@@ -5,6 +5,7 @@ import { COLS, ROWS, project, tileCorners, tileFeet, tileCenter } from '../syste
 import { SKITTER, SENTRY, BOMB_SPIDER, ROOTABREAK, AUTOSCALE } from '../data/viruses.js';
 import { FIT_MAX } from '../systems/spriteFit.js';
 import { SCRIPTS } from '../systems/dialogue.js';
+import { sound } from '../systems/sound.js';
 
 export const PumpkinMethods = {
   spawnPumpkin(col, row) {
@@ -18,6 +19,7 @@ export const PumpkinMethods = {
       hp: BOSS.maxHp, maxHp: BOSS.maxHp, alive: true,
       nextMove: 0, nextAttack: 0,
       nextTwitch: 0, // set on first AI tick
+      lastPhase: null,
       hpBar: this.makeHpBar(),
     };
     // Breathing: barely-there squash-and-stretch, pauses during teleport
@@ -48,6 +50,9 @@ export const PumpkinMethods = {
   },
   pumpkinAI(e, time) {
     const phase = this.bossPhase(e);
+    // dramatic sting on phase change
+    if (e.lastPhase && e.lastPhase !== phase) sound.battleStart();
+    e.lastPhase = phase;
 
     // rare unnerving twitch: sudden jerk with no easing, then still
     if (!e.nextTwitch) e.nextTwitch = time + Phaser.Math.Between(3000, 6000);
@@ -86,6 +91,7 @@ export const PumpkinMethods = {
       const warn = this.highlightTile(target.col, target.row, 0xff5252, 0.4);
       this.time.delayedCall(700, () => {
         warn.destroy();
+        sound.slam();
         if (this.over) return;
         // hit if navi is still on the warned tile
         if (this.naviPos.col === target.col && this.naviPos.row === target.row) {

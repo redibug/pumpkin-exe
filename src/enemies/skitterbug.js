@@ -5,6 +5,7 @@ import { COLS, ROWS, project, tileCorners, tileFeet, tileCenter } from '../syste
 import { SKITTER, SENTRY, BOMB_SPIDER, ROOTABREAK, AUTOSCALE } from '../data/viruses.js';
 import { FIT_MAX } from '../systems/spriteFit.js';
 import { SCRIPTS } from '../systems/dialogue.js';
+import { sound } from '../systems/sound.js';
 
 export const SkitterbugMethods = {
   spawnSkitterbug(col, row) {
@@ -78,6 +79,7 @@ export const SkitterbugMethods = {
     e.canSpit = true; // moving restores the spit
   },
   spitIchor(e) {
+    sound.spit();
     // shoot animation: rear up (squash), then snap forward as the bullet fires
     const s = e.sprite;
     const bx = s.scaleX, by = s.scaleY;

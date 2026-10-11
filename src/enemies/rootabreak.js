@@ -5,6 +5,7 @@ import { COLS, ROWS, project, tileCorners, tileFeet, tileCenter } from '../syste
 import { SKITTER, SENTRY, BOMB_SPIDER, ROOTABREAK, AUTOSCALE } from '../data/viruses.js';
 import { FIT_MAX } from '../systems/spriteFit.js';
 import { SCRIPTS } from '../systems/dialogue.js';
+import { sound } from '../systems/sound.js';
 
 export const RootabreakMethods = {
   spawnRootabreak(col, row, big = false) {
@@ -95,9 +96,10 @@ export const RootabreakMethods = {
       targets: md.sprite, angle: 6,
       duration: 200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
     });
+    sound.leap();
     // leap up
     this.tweens.add({
-      targets: md.sprite, y: airHomeY - ROOTABREAK.leapHeightPx,
+      targets: md.sprite, y: airHomeY - ROOTABREAK.leapHeightPx, // leap sound below
       duration: ROOTABREAK.leapMs, ease: 'Quad.easeOut',
       onComplete: () => {
         if (!md.alive) return;
@@ -105,6 +107,7 @@ export const RootabreakMethods = {
         // (from the sprite's air position, not the ground)
         // Offsets scale with displayHeight so they track the head at any distance.
         md.state = 'screaming';
+        sound.scream();
         const sx = md.sprite.x, sy = md.sprite.y;
         const dh = md.sprite.displayHeight;
         const textY = sy - 0.95 * dh; // at head height

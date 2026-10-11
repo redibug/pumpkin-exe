@@ -2,6 +2,7 @@
 // Mixed into BattleScene via Object.assign, so `this` is the scene.
 import Phaser from 'phaser';
 import { CHIP_MAP } from '../data/chips.js';
+import { sound } from '../systems/sound.js';
 
 export const CUSTOM_GAUGE_MS = 10000; // battle time to fill the custom gauge
 export const HAND_MAX = 5;            // chip-case slots in the custom screen
@@ -9,6 +10,7 @@ export const LOADOUT_MAX = 4;         // selected cards -> the 1-4 chip slots
 
 export const CustomScreenMethods = {
   openCustom(skipKeyGuard = false) {
+    sound.customOpen();
     if (this.customOpen || this.over || this.dialogue.isActive()) return;
     this.customOpen = true;
     this.customTimer = 0;
@@ -41,6 +43,7 @@ export const CustomScreenMethods = {
     this.input.keyboard.on('keydown', this._customKeyHandler);
   },
   drawToHand() {
+    sound.chipSelect();
     // chip case: new chips load into the empty slots; the rest stay put
     for (let i = 0; i < HAND_MAX; i++) {
       if (this.hand[i]) continue;
@@ -93,6 +96,7 @@ export const CustomScreenMethods = {
     this.refreshCustom();
   },
   activateCustomCursor() {
+    sound.cursorMove();
     const cur = this.customCursor;
     if (cur.row === 0) {
       this.toggleCustomSelect();
@@ -102,6 +106,7 @@ export const CustomScreenMethods = {
     }
   },
   toggleCustomSelect() {
+    sound.chipSelect();
     const i = this.customCursor.col;
     if (i < 0 || i >= HAND_MAX || !this.hand[i]) return; // empty slot
     const at = this.customSelected.indexOf(i);
@@ -114,6 +119,7 @@ export const CustomScreenMethods = {
     }
   },
   toggleCustomDiscard() {
+    sound.chipSelect();
     const i = this.customCursor.col;
     if (i < 0 || i >= HAND_MAX || !this.hand[i]) return; // empty slot
     const m = this.customDiscard.indexOf(i);
@@ -126,6 +132,7 @@ export const CustomScreenMethods = {
     }
   },
   confirmCustom() {
+    sound.chipConfirm();
     if (this.customSelected.length === 0 && this.customDiscard.length === 0) {
       this.closeCustomUI(); // nothing picked or marked: keep loadout
       return;
@@ -146,9 +153,11 @@ export const CustomScreenMethods = {
     this.closeCustomUI();
   },
   cancelCustom() {
+    sound.chipCancel();
     this.closeCustomUI(); // gauge stays spent, loadout unchanged
   },
   closeCustomUI() {
+    sound.customClose();
     this.input.keyboard.off('keydown', this._customKeyHandler);
     this._customKeyHandler = null;
     this.input.off('pointerup', this._customArmHandler);

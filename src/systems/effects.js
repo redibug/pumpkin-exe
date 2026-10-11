@@ -2,9 +2,11 @@
 // Mixed into BattleScene via Object.assign, so `this` is the scene.
 import Phaser from 'phaser';
 import { tileCorners } from './grid.js';
+import { sound } from './sound.js';
 
 export const EffectsMethods = {
   teleportMove(sprite, col, row, manual, onDone) {
+    sound.teleport();
     if (sprite.getData('teleporting')) {
       this.placeFighter(sprite, col, row, manual); // fallback: instant pop
       if (onDone) onDone();

@@ -1,4 +1,5 @@
 // dialogue.js — MMBN-style dialogue system (jam day 1).
+import { sound } from './sound.js';
 //
 // A text window slides in at the top of the screen; text appears teletype-
 // style with a per-character mugshot on the configured side. While a script
@@ -138,8 +139,12 @@ export class DialogueUI {
   update(delta) {
     if (!this.active) return;
     if (this.shown < this.fullText.length) {
+      const prev = Math.floor(this.shown);
       this.shown = Math.min(this.fullText.length, this.shown + (delta / 1000) * CPS);
-      this.bodyText.setText(this.fullText.slice(0, Math.floor(this.shown)));
+      const cur = Math.floor(this.shown);
+      // blip every 3rd character
+      if (cur > prev && cur % 3 === 0) sound.dialogueBlip();
+      this.bodyText.setText(this.fullText.slice(0, cur));
       if (this.shown >= this.fullText.length) this.hint.setVisible(true);
     } else {
       // blink the "more" arrow

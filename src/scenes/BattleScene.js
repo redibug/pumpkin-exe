@@ -13,6 +13,7 @@ import { BombSpiderMethods } from '../enemies/bombSpider.js';
 import { RootabreakMethods } from '../enemies/rootabreak.js';
 import { PumpkinMethods } from '../enemies/pumpkin.js';
 import { EffectsMethods } from '../systems/effects.js';
+import { sound } from '../systems/sound.js';
 import { CustomScreenMethods, CUSTOM_GAUGE_MS, HAND_MAX, LOADOUT_MAX } from '../ui/customScreen.js';
 import { NaviMethods, NAVI_MANUAL } from '../player/navi.js';
 
@@ -89,6 +90,16 @@ export default class BattleScene extends Phaser.Scene {
   create() {
     this.over = false;
     this.time.paused = false; // insurance: never boot a restart mid-pause
+
+    // audio unlocks on first gesture
+    sound.init();
+    this.input.once('pointerdown', () => sound.resume());
+    this.input.keyboard.once('keydown', () => sound.resume());
+    this.input.keyboard.on('keydown-M', () => {
+      const on = sound.toggleMute();
+      // tiny visual feedback could go here
+    });
+    sound.battleStart();
 
     // ---- state ----
     this.naviHp = this._carriedHp; this.naviMaxHp = 100;
@@ -661,6 +672,7 @@ export default class BattleScene extends Phaser.Scene {
     this.flash(e.sprite, 0xffffff);
     this.updateHpBar(e);
     if (e.hp <= 0) {
+      sound.enemyDie();
       e.alive = false;
       if (e.warnRect) { e.warnRect.destroy(); e.warnRect = null; }
       if (e.sprout) e.sprout.setVisible(false);
@@ -691,6 +703,7 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   damageNavi(amount) {
+    sound.hurt();
     if (this.over) return;
     this.naviHp = Math.max(0, this.naviHp - amount);
     this.flash(this.navi, 0xff5252);
@@ -799,6 +812,7 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   showGameOver() {
+    sound.gameOver();
     this.over = true;
     const title = this.makeFancyTitle(480, 250, 'GAME OVER', '#ff8a80', '#d32f2f', '#4a0000');
     const sub = this.add.text(480, 320, 'press R to jack in again', {
@@ -811,6 +825,7 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   showVictory() {
+    sound.victory();
     this.over = true;
     const battle = BATTLES[this.battleIndex];
     const title = this.makeFancyTitle(480, 250, 'VIRUS DELETED', '#c8e6c9', '#2e7d32', '#0a2a0a');

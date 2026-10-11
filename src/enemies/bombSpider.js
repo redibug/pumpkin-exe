@@ -5,6 +5,7 @@ import { COLS, ROWS, project, tileCorners, tileFeet, tileCenter } from '../syste
 import { SKITTER, SENTRY, BOMB_SPIDER, ROOTABREAK, AUTOSCALE } from '../data/viruses.js';
 import { FIT_MAX } from '../systems/spriteFit.js';
 import { SCRIPTS } from '../systems/dialogue.js';
+import { sound } from '../systems/sound.js';
 
 export const BombSpiderMethods = {
   spawnBombSpider(col, row) {
@@ -107,6 +108,7 @@ export const BombSpiderMethods = {
     }
   },
   throwBomb(e) {
+    sound.bombThrow();
     e.hasBomb = false;
     e.bombBack.setVisible(false);
     // target: 3 tiles forward (toward player), same row; clamp to grid
@@ -154,6 +156,7 @@ export const BombSpiderMethods = {
     // explosion sprite on the landing tile
     const c = tileCenter(col, row);
     this.playExplosion(c.x, c.y, 0.6);
+    sound.explosion();
     // damage: landing tile + orthogonal adjacent (plus-shape, no diagonals)
     const nc = this.naviPos.col, nr = this.naviPos.row;
     const manhattan = Math.abs(nc - col) + Math.abs(nr - row);

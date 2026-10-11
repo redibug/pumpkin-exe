@@ -5,6 +5,7 @@ import { COLS, ROWS, project, tileCorners, tileFeet, tileCenter } from '../syste
 import { SKITTER, SENTRY, BOMB_SPIDER, ROOTABREAK, AUTOSCALE } from '../data/viruses.js';
 import { FIT_MAX } from '../systems/spriteFit.js';
 import { SCRIPTS } from '../systems/dialogue.js';
+import { sound } from '../systems/sound.js';
 
 export const SentryMethods = {
   spawnSentry(col, row) {
@@ -50,6 +51,7 @@ export const SentryMethods = {
     // ready: the moment the navi steps onto its row, activate
     if (this.naviPos.row !== e.row) return;
     e.state = 'activated';
+    sound.warning();
 
     // sensor light flashes red for slightly less than a second
     e.sensor.setVisible(true);
@@ -67,6 +69,7 @@ export const SentryMethods = {
     });
   },
   fireSentryLaser(e) {
+    sound.laser();
     // Instant piercing hitscan (like the railgun chip, but firing left at
     // the navi). Powerful kickback shoves the sentry right slightly.
     const s = e.sprite;

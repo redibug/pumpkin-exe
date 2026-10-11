@@ -3,6 +3,7 @@
 import Phaser from 'phaser';
 import { COLS, ROWS, tileCorners, tileFeet, tileCenter, isPlayerTile } from '../systems/grid.js';
 import { CHIP_MAP } from '../data/chips.js';
+import { sound } from '../systems/sound.js';
 
 export const NAVI_MANUAL = 1;
 
@@ -23,6 +24,7 @@ export const NaviMethods = {
     if (nc !== col || nr !== row) {
       this.naviPos = { col: nc, row: nr };
       this._lastMove = time;
+      sound.step();
       this.teleportMove(this.navi, nc, nr, NAVI_MANUAL);
     }
   },
@@ -71,12 +73,14 @@ export const NaviMethods = {
     this.fireRapidShot(slot);
   },
   fireRapidShot(slot) {
+    sound.buster();
     const chip = CHIP_MAP.rapid;
     // hitscan like the buster: instant beam, hits first enemy ahead on the row
     const row = this.naviPos.row;
     const s = this.navi.scaleX;
     const mx = this.navi.x + 45 * s, my = this.navi.y - 115 * s;
     this.showMuzzleFlash(mx, my, row);
+    sound.buster();
     let target = null, targetCol = 99;
     for (const e of this.enemies) {
       if (!e.alive) continue;
@@ -138,6 +142,7 @@ export const NaviMethods = {
     const s = this.navi.scaleX;
     const mx = this.navi.x + 45 * s, my = this.navi.y - 115 * s;
     this.showMuzzleFlash(mx, my, row);
+    sound.buster();
     // first alive enemy ahead on the navi's row (any type)
     let target = null, targetCol = 99;
     for (const e of this.enemies) {
@@ -192,12 +197,14 @@ export const NaviMethods = {
     const feet = tileFeet(this.naviPos.col, this.naviPos.row);
 
     if (chip.id === 'recover') {
+      sound.recover();
       this.naviHp = Math.min(this.naviMaxHp, this.naviHp + 60);
       this.flash(this.navi, 0x81c784);
       return;
     }
 
     if (chip.id === 'sword') {
+      sound.sword();
       const target = { col: this.naviPos.col + 1, row: this.naviPos.row };
       for (const e of this.enemies) {
         if (!e.alive) continue;
@@ -213,6 +220,7 @@ export const NaviMethods = {
     }
 
     if (chip.id === 'bomb') {
+      sound.bombThrow();
       // Lob a bomb 3 tiles ahead; explodes in a plus shape (like the spider's)
       const targetCol = Math.min(COLS - 1, this.naviPos.col + 3);
       const targetRow = this.naviPos.row;
@@ -249,6 +257,7 @@ export const NaviMethods = {
           // explosion sprite
           const c = tileCenter(targetCol, targetRow);
           this.playExplosion(c.x, c.y, 0.6);
+          sound.explosion();
           // damage enemies on the landing tile + orthogonal adjacent
           for (const e of this.enemies) {
             if (!e.alive) continue;
@@ -265,6 +274,7 @@ export const NaviMethods = {
     }
 
     if (chip.id === 'railgun') {
+      sound.railgun();
       // Instant hitscan that pierces: hits ALL enemies on the navi's row.
       const row = this.naviPos.row;
       const s = this.navi.scaleX;
@@ -286,6 +296,9 @@ export const NaviMethods = {
       return;
     }
 
+    if (chip.id === 'cannon') sound.cannon();
+    else if (chip.id === 'spread') sound.spread();
+    else if (chip.id === 'rapid') sound.buster();
     const rows = chip.id === 'spread'
       ? [this.naviPos.row - 1, this.naviPos.row, this.naviPos.row + 1].filter((r) => r >= 0 && r < ROWS)
       : [this.naviPos.row];
