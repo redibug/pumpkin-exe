@@ -213,9 +213,10 @@ export const NaviMethods = {
           this.damageEnemy(e, chip.damage);
         }
       }
-      // sword arc flash on the target tile
-      const arc = this.highlightTile(target.col, target.row, chip.color, 0.35);
-      this.time.delayedCall(140, () => arc.destroy());
+      // sword slash arc on the target tile (perspective-scaled)
+      const sc = tileCenter(target.col, target.row);
+      const sf = tileFeet(target.col, target.row);
+      this.playSwordSlash(sc.x, sc.y, chip.color, sf.s);
       return;
     }
 

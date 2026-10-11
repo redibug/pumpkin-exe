@@ -191,6 +191,37 @@ export const EffectsMethods = {
     });
     tw._noPause = true;
   },
+  playSwordSlash(x, y, color = 0x4fc3f7, scale = 1) {
+    // Crescent slash arc: draws in fast, fades out. Additive for glow.
+    const g = this.add.graphics();
+    g.lineStyle(10, color, 1);
+    // arc from upper-right sweeping to lower-left (a backhand slash)
+    const r = 55;
+    g.arc(0, 0, r, Phaser.Math.DegToRad(-70), Phaser.Math.DegToRad(50), false);
+    g.strokePath();
+    // inner bright core
+    g.lineStyle(4, 0xffffff, 0.9);
+    g.arc(0, 0, r, Phaser.Math.DegToRad(-70), Phaser.Math.DegToRad(50), false);
+    g.strokePath();
+    g.setPosition(x, y);
+    g.setScale(scale);
+    g.setDepth(25);
+    g.setBlendMode(Phaser.BlendModes.ADD);
+    g.setAlpha(0);
+    // slash in: scale up + fade in fast, then fade out
+    this.tweens.add({
+      targets: g, alpha: 1, scaleX: scale * 1.15, scaleY: scale * 1.15,
+      duration: 70, ease: 'Quad.easeOut',
+      onComplete: () => {
+        this.tweens.add({
+          targets: g, alpha: 0,
+          duration: 130, ease: 'Quad.easeIn',
+          onComplete: () => { if (g.active) g.destroy(); },
+        });
+      },
+    });
+    return g;
+  },
   playExplosion(x, y, scale = 1, depth = 20) {
     // Sprite-sheet explosion: 8 frames, additive blend for glow.
     const spr = this.add.sprite(x, y, 'explosion', 0);
