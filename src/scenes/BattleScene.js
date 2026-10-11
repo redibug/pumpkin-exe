@@ -1930,18 +1930,21 @@ export default class BattleScene extends Phaser.Scene {
     // Sound wave: vertical arc, endpoints toward the rootabreak, bulging
     // outward — like a ripple tracing a circle around them.
     // Spawns at the sprite's air position with perspective scale.
+    // The arc's leading edge (bulge) is at local x=0 so the hitbox (proj.x)
+    // lines up with the visual.
     const g = this.add.graphics();
     const color = 0xce93d8;
     g.lineStyle(4, color, 0.9);
-    // arc: radius 34, spanning ~100 degrees on the outer side
+    // arc: radius 34, spanning ~100 degrees. Circle center offset so the
+    // bulge (leading edge) sits at x=0.
     const radius = 34;
     const halfAngle = Phaser.Math.DegToRad(50);
     if (dir > 0) {
-      // right side: arc bulging right, center to the left (at rootabreak)
-      g.arc(radius, 0, radius, -halfAngle, halfAngle, false);
+      // right side: bulge at x=0, circle center to the left
+      g.arc(-radius, 0, radius, -halfAngle, halfAngle, false);
     } else {
-      // left side: arc bulging left, center to the right
-      g.arc(-radius, 0, radius, Math.PI - halfAngle, Math.PI + halfAngle, false);
+      // left side: bulge at x=0, circle center to the right
+      g.arc(radius, 0, radius, Math.PI - halfAngle, Math.PI + halfAngle, false);
     }
     g.strokePath();
     // perspective: match the sprite's scale (going forward, all projectiles
