@@ -418,8 +418,31 @@ export default class BattleScene extends Phaser.Scene {
       state: 'planted', // planted | leaping | screaming | falling
       nextJump: -1, // init on first AI tick (column-synced)
       screamText: null, wiggleTween: null,
+      sproutPopping: false, // true during the replant pop-in (idle pauses)
       hpBar: this.makeHpBar(),
     };
+    // Sprout idle: gentle squash-and-stretch like skitterbug (feet planted)
+    enemy.sproutBaseScaleX = sprout.scaleX;
+    enemy.sproutBaseScaleY = sprout.scaleY;
+    enemy.sproutSquash = { v: 0 };
+    enemy.sproutBob = this.tweens.add({
+      targets: enemy.sproutSquash,
+      v: 1,
+      duration: 900 + Math.random() * 400, // desync per plant
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+      onUpdate: () => {
+        if (!enemy.alive) return;
+        if (enemy.state !== 'planted' || !enemy.sprout.visible) return;
+        if (enemy.sproutPopping) return; // pop-in owns the scale
+        const k = enemy.sproutSquash.v;
+        enemy.sprout.setScale(
+          enemy.sproutBaseScaleX * (1 + 0.03 * k), // wider
+          enemy.sproutBaseScaleY * (1 - 0.05 * k)  // shorter
+        );
+      },
+    });
     this.enemies.push(enemy);
     return enemy;
   }
@@ -1909,12 +1932,16 @@ export default class BattleScene extends Phaser.Scene {
                   md.sprite.setVisible(false);
                   // sprout pops in at the bottom-aligned position
                   md.sprout.setPosition(md.sprite.x, md.sproutY).setVisible(true);
-                  const ss = md.sprout.scaleX || 1;
-                  // (scale was left intact; pop from 0 for the transition)
+                  md.sproutPopping = true;
                   md.sprout.setScale(0);
+                  // refresh base scale (perspective may have changed)
+                  const mp = tileFeet(md.col, md.row);
+                  md.sproutBaseScaleX = mp.s * 0.9;
+                  md.sproutBaseScaleY = mp.s * 0.9;
                   this.tweens.add({
-                    targets: md.sprout, scaleX: ss, scaleY: ss,
+                    targets: md.sprout, scaleX: md.sproutBaseScaleX, scaleY: md.sproutBaseScaleY,
                     duration: 160, ease: 'Back.easeOut',
+                    onComplete: () => { md.sproutPopping = false; },
                   });
                   md.nextJump = this.time.now + M.plantedMs + (md.col - 3) * M.columnDelayMs;
                 },
@@ -2258,6 +2285,7 @@ export default class BattleScene extends Phaser.Scene {
       e.alive = false;
       if (e.warnRect) { e.warnRect.destroy(); e.warnRect = null; }
       if (e.sprout) e.sprout.setVisible(false);
+      if (e.sproutBob) e.sproutBob.stop();
       if (e.screamText) { e.screamText.destroy(); e.screamText = null; }
       if (e.wiggleTween) { e.wiggleTween.stop(); e.wiggleTween = null; }
       e.sprite.setAngle(0);
