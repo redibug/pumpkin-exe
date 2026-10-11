@@ -6,7 +6,24 @@ export default class TitleScene extends Phaser.Scene {
     super('Title');
   }
 
+  preload() {
+    this.load.audio('mus-title', 'assets/audio/Jam Network Title Theme.mp3');
+  }
+
   create() {
+    this.events.once('shutdown', () => {
+      if (this._titleMus) { this._titleMus.stop(); this._titleMus.destroy(); this._titleMus = null; }
+    });
+    // title music (starts on first interaction to satisfy autoplay policy)
+    const startMus = () => {
+      if (!this._musStarted) {
+        this._musStarted = true;
+        this._titleMus = this.sound.add('mus-title', { loop: true, volume: 0.4 });
+        this._titleMus.play();
+      }
+    };
+    this.input.once('pointerdown', startMus);
+    this.input.keyboard.once('keydown', startMus);
     const { width, height } = this.scale;
     const cx = width / 2;
 

@@ -83,11 +83,17 @@ export default class BattleScene extends Phaser.Scene {
     this.load.image('chip-frame', 'assets/ui/chip-frame.png');
     this.load.image('mug-bugchan', 'assets/mugshots/mug-bugchan.png');
     this.load.image('mug-mel', 'assets/mugshots/mug-mel.png');
+    this.load.audio('mus-battle', 'assets/audio/Jam Network Battle Theme.mp3');
+    this.load.audio('mus-boss', 'assets/audio/Jam Network Boss Theme.mp3');
     this.load.image('mug-pumpkin', 'assets/mugshots/mug-pumpkin.png');
     this.load.image('mug-mandrake', 'assets/mugshots/mug-mandrake.png');
   }
 
   create() {
+    // stop BGM when leaving/restarting the scene
+    this.events.once('shutdown', () => {
+      if (this._bgm) { this._bgm.stop(); this._bgm.destroy(); this._bgm = null; }
+    });
     this.over = false;
     this.time.paused = false; // insurance: never boot a restart mid-pause
 
@@ -97,9 +103,18 @@ export default class BattleScene extends Phaser.Scene {
     this.input.keyboard.once('keydown', () => sound.resume());
     this.input.keyboard.on('keydown-M', () => {
       const on = sound.toggleMute();
-      // tiny visual feedback could go here
+      // also mute/unmute the background music
+      if (this._bgm) this._bgm.setMute(!on);
     });
     sound.battleStart();
+    // background music: boss theme for PUMPKIN.EXE, battle theme otherwise
+    const isBoss = BATTLES[this.battleIndex]?.name === 'PUMPKIN.EXE';
+    this._bgm = this.sound.add(isBoss ? 'mus-boss' : 'mus-battle', { loop: true, volume: 0.35 });
+    this._bgm.setMute(!sound.enabled);
+    // start after first gesture (autoplay policy); SFX init already handles unlock
+    const playBgm = () => { if (!this._bgm.isPlaying) this._bgm.play(); };
+    this.input.once('pointerdown', playBgm);
+    this.input.keyboard.once('keydown', playBgm);
 
     // ---- state ----
     this.naviHp = this._carriedHp; this.naviMaxHp = 100;
