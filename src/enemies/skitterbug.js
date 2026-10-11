@@ -2,7 +2,7 @@
 // Methods are mixed into BattleScene via Object.assign, so `this` is the scene.
 import Phaser from 'phaser';
 import { COLS, ROWS, project, tileCorners, tileFeet, tileCenter } from '../systems/grid.js';
-import { SKITTER, SENTRY, BOMB_SPIDER, ROOTABREAK, AUTOSCALE } from '../systems/viruses.js';
+import { SKITTER, SENTRY, BOMB_SPIDER, ROOTABREAK, AUTOSCALE } from '../data/viruses.js';
 import { FIT_MAX } from '../systems/spriteFit.js';
 import { SCRIPTS } from '../systems/dialogue.js';
 

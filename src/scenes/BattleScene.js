@@ -1,12 +1,12 @@
 import Phaser from 'phaser';
 import { COLS, ROWS, project, tileCorners, tileFeet, tileCenter, isPlayerTile, gridParams, setGridParams, getGridParams, hexToRgb } from '../systems/grid.js';
-import { CHIP_MAP, DECK, BOSS } from '../systems/chips.js';
-import { ROOTABREAK, SKITTER, SENTRY, BOMB_SPIDER, AUTOSCALE } from '../systems/viruses.js';
+import { CHIP_MAP, DECK, BOSS } from '../data/chips.js';
+import { ROOTABREAK, SKITTER, SENTRY, BOMB_SPIDER, AUTOSCALE } from '../data/viruses.js';
 import { fitFactor, FIT_MAX } from '../systems/spriteFit.js';
 import { createDebugGameplay, isDialogueSkipped } from '../systems/debugGameplay.js';
 import { createDebugOverlay } from '../systems/debugOverlay.js';
 import { DialogueUI, SCRIPTS } from '../systems/dialogue.js';
-import { BATTLES } from '../systems/battles.js';
+import { BATTLES } from '../data/battles.js';
 import { SkitterbugMethods } from '../enemies/skitterbug.js';
 import { SentryMethods } from '../enemies/sentry.js';
 import { BombSpiderMethods } from '../enemies/bombSpider.js';
