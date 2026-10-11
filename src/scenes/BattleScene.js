@@ -396,11 +396,11 @@ export default class BattleScene extends Phaser.Scene {
     // planted: sprout visible, main sprite hidden
     // centered on the tile (it's rooted, not standing)
     const sprout = this.add.image(mc.x, mc.y, 'rootabreak-sprout');
-    sprout.setOrigin(0.5, 0.5);
+    sprout.setOrigin(0.5, 0.9);
     sprout.setScale(mp.s * 0.9).setDepth(9 + row);
     const sprite = this.physics.add.sprite(mc.x, mc.y, 'rootabreak').setVisible(false);
     sprite.setData('fitMax', AUTOSCALE.rootabreak ?? FIT_MAX);
-    sprite.setOrigin(0.5, 0.5); // centered on the tile
+    sprite.setOrigin(0.5, 0.9); // lifted off the tile surface
     if (big) sprite.setTint(0xffab91); // big one: slightly red tint
     this.placeFighter(sprite, col, row, MANDRAKE_MANUAL * (big ? 1.35 : 1));
     // override placeFighter's feet positioning: center on the tile
