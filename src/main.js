@@ -14,6 +14,7 @@ const config = {
   roundPixels: false,
   backgroundColor: '#05060f',
   physics: { default: 'arcade', arcade: { debug: false } },
+  input: { gamepad: true },
   scene: [TitleScene, BattleScene],
 };
 

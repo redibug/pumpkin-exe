@@ -551,6 +551,24 @@ export default class BattleScene extends Phaser.Scene {
 
   // ================= main loop =================
 
+  // Gamepad helper: returns the first connected pad, or null.
+  // Standard mapping: D-pad/stick = move, A = buster/confirm,
+  // X = front chip, LB/RB or Start = custom screen.
+  getPad() {
+    const pads = this.input.gamepad?.gamepads;
+    if (!pads) return null;
+    for (const p of pads) { if (p && p.connected) return p; }
+    return null;
+  }
+  // Gamepad button JustDown (with edge detection)
+  padJustDown(pad, btn) {
+    if (!pad) return false;
+    const key = `_pad${btn}`;
+    const down = pad.buttons[btn]?.pressed;
+    const was = this[key];
+    this[key] = down;
+    return down && !was;
+  }
   update(time, delta) {
     // visual follows run even when paused (don't affect game timing)
     this.syncBombBacks();
@@ -565,7 +583,9 @@ export default class BattleScene extends Phaser.Scene {
     if (this.customTimer < CUSTOM_GAUGE_MS) {
       this.customTimer = Math.min(this.customTimer + delta, CUSTOM_GAUGE_MS);
       this.updateCustomGaugeHud();
-    } else if (Phaser.Input.Keyboard.JustDown(this.customKey)) {
+    } else if (Phaser.Input.Keyboard.JustDown(this.customKey)
+      || this.padJustDown(this.getPad(), 4) || this.padJustDown(this.getPad(), 5)
+      || this.padJustDown(this.getPad(), 9)) {
       this.openCustom(true); // in scene update: no keydown dispatch in flight
     }
     this.handleMovement(time);

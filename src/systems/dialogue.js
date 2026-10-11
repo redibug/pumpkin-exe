@@ -137,7 +137,15 @@ export class DialogueUI {
   }
 
   update(delta) {
-    if (!this.active) return;
+    // gamepad A advances dialogue
+    const pad = this.scene.getPad?.();
+    if (pad) {
+      const key = '_dlgPadA';
+      const down = pad.buttons[0]?.pressed;
+      const was = this[key];
+      this[key] = down;
+      if (down && !was) this.advance();
+    }    if (!this.active) return;
     if (this.shown < this.fullText.length) {
       const prev = Math.floor(this.shown);
       this.shown = Math.min(this.fullText.length, this.shown + (delta / 1000) * CPS);

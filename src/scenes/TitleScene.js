@@ -24,4 +24,15 @@ export default class TitleScene extends Phaser.Scene {
     this.input.keyboard.once('keydown-ENTER', () => this.scene.start('Battle'));
     this.input.once('pointerdown', () => this.scene.start('Battle'));
   }
+  update() {
+    // gamepad: Start (9) or A (0) to start
+    const pads = this.input.gamepad?.gamepads;
+    if (!pads) return;
+    for (const p of pads) {
+      if (p && p.connected && (p.buttons[9]?.pressed || p.buttons[0]?.pressed)) {
+        this.scene.start('Battle');
+        break;
+      }
+    }
+  }
 }

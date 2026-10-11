@@ -13,10 +13,24 @@ export const NaviMethods = {
     if (this._lastMove && time - this._lastMove < 160) return;
     const { col, row } = this.naviPos;
     let nc = col, nr = row;
-    if (Phaser.Input.Keyboard.JustDown(this.cursors.left)) nc--;
-    else if (Phaser.Input.Keyboard.JustDown(this.cursors.right)) nc++;
-    else if (Phaser.Input.Keyboard.JustDown(this.cursors.up)) nr--;
-    else if (Phaser.Input.Keyboard.JustDown(this.cursors.down)) nr++;
+    const pad = this.getPad?.();
+    const padLeft = pad && (pad.buttons[14]?.pressed || pad.leftStick.x < -0.5);
+    const padRight = pad && (pad.buttons[15]?.pressed || pad.leftStick.x > 0.5);
+    const padUp = pad && (pad.buttons[12]?.pressed || pad.leftStick.y < -0.5);
+    const padDown = pad && (pad.buttons[13]?.pressed || pad.leftStick.y > 0.5);
+    // edge detection for pad (only trigger on fresh press)
+    const padMove = (dir) => {
+      if (!pad) return false;
+      const key = `_padMove${dir}`;
+      const down = dir === 'l' ? padLeft : dir === 'r' ? padRight : dir === 'u' ? padUp : padDown;
+      const was = this[key];
+      this[key] = down;
+      return down && !was;
+    };
+    if (Phaser.Input.Keyboard.JustDown(this.cursors.left) || padMove('l')) nc--;
+    else if (Phaser.Input.Keyboard.JustDown(this.cursors.right) || padMove('r')) nc++;
+    else if (Phaser.Input.Keyboard.JustDown(this.cursors.up) || padMove('u')) nr--;
+    else if (Phaser.Input.Keyboard.JustDown(this.cursors.down) || padMove('d')) nr++;
     else return;
 
     nc = Phaser.Math.Clamp(nc, 0, 2);
@@ -30,7 +44,9 @@ export const NaviMethods = {
   },
   handleChips(time) {
     // X: buster shoot (hitscan). Z/Space: use the front chip. 1-4: chips out of order.
-    if (Phaser.Input.Keyboard.JustDown(this.shootKey)) this.fireShoot(time);
+    // Gamepad: A = buster, X = front chip.
+    const pad = this.getPad?.();
+    if (Phaser.Input.Keyboard.JustDown(this.shootKey) || this.padJustDown(pad, 0)) this.fireShoot(time);
     // Rapid fire: keep firing while the key is held (started via JustDown below).
     // Uses the scene clock for timing to avoid stale `time` params.
     if (this.rapidFiring) {
@@ -43,7 +59,8 @@ export const NaviMethods = {
     }
     const frontDown = Phaser.Input.Keyboard.JustDown(this.chipFrontKey);
     const front2Down = Phaser.Input.Keyboard.JustDown(this.chipFrontKey2);
-    if (frontDown || front2Down) {
+    const padFront = this.padJustDown(pad, 2); // gamepad X
+    if (frontDown || front2Down || padFront) {
       this.pressChipKey(0, frontDown ? this.chipFrontKey : this.chipFrontKey2);
     }
     const keyMap = [this.keys.ONE, this.keys.TWO, this.keys.THREE, this.keys.FOUR];
