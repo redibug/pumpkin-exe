@@ -196,6 +196,7 @@ export default class BattleScene extends Phaser.Scene {
     this.battleIndex = data.battleIndex || 0;
     // HP carries between battles (no heal); defaults to full on fresh start/retry
     this._carriedHp = (typeof data.naviHp === 'number') ? data.naviHp : 100;
+    console.log(`[HP DEBUG] init: battleIndex=${this.battleIndex}, data.naviHp=${data.naviHp}, _carriedHp=${this._carriedHp}`);
   }
 
   preload() {
@@ -2226,6 +2227,7 @@ export default class BattleScene extends Phaser.Scene {
       this.startDialogue(battle.victory, () => {
         this.startDialogue(battle.story, () => {
           // no heal between battles: carry current HP forward
+          console.log(`[HP DEBUG] restarting: battleIndex=${this.battleIndex + 1}, naviHp=${this.naviHp}`);
           this.scene.restart({ battleIndex: this.battleIndex + 1, naviHp: this.naviHp });
         });
       });
