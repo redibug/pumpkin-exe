@@ -397,7 +397,7 @@ export default class BattleScene extends Phaser.Scene {
     sprout.setScale(mp.s * 0.9).setDepth(9 + row);
     const sprite = this.physics.add.sprite(mp.x, mp.y, 'rootabreak').setVisible(false);
     sprite.setData('fitMax', AUTOSCALE.rootabreak ?? FIT_MAX);
-    sprite.setOrigin(0.5, 1);
+    sprite.setOrigin(0.5, 0.9); // grounded origin
     if (big) sprite.setTint(0xffab91); // big one: slightly red tint
     this.placeFighter(sprite, col, row, MANDRAKE_MANUAL * (big ? 1.35 : 1));
     // store the home position for the leap (sprite returns here)
@@ -1810,12 +1810,17 @@ export default class BattleScene extends Phaser.Scene {
     }
     if (md.state !== 'planted' || time < md.nextJump) return;
 
-    // LEAP: hide sprout, show sprite, jump up
+    // LEAP: hide sprout, show sprite, switch to air origin (0.5, 0.5)
     md.state = 'leaping';
     md.sprout.setVisible(false);
     md.sprite.setVisible(true);
     const manual = MANDRAKE_MANUAL * (md.big ? 1.35 : 1);
     this.placeFighter(md.sprite, md.col, md.row, manual);
+    // switch origin to center for the air; compensate y so it doesn't shift
+    const dh = md.sprite.displayHeight;
+    md.sprite.setOrigin(0.5, 0.5);
+    md.sprite.y -= (0.9 - 0.5) * dh;
+    const airHomeY = md.sprite.y;
     // pop-in scale
     const targetScale = md.sprite.scaleX;
     md.sprite.setScale(targetScale * 0.3);
@@ -1825,19 +1830,27 @@ export default class BattleScene extends Phaser.Scene {
     });
     // leap up
     this.tweens.add({
-      targets: md.sprite, y: md.homeY - M.leapHeightPx,
+      targets: md.sprite, y: airHomeY - M.leapHeightPx,
       duration: M.leapMs, ease: 'Quad.easeOut',
       onComplete: () => {
         if (!md.alive) return;
-        // SCREAM at peak: KYAAAH!! + noise projectiles left and right
+        // SCREAM at peak: KYAAH! floats up and fades, sound waves out
         md.state = 'screaming';
         const sc = tileCenter(md.col, md.row);
-        md.screamText = this.add.text(sc.x, sc.y - 110, 'KYAAAH!!', {
+        md.screamText = this.add.text(sc.x, sc.y - 110, 'KYAAH!', {
           fontFamily: 'monospace', fontSize: '22px', color: '#ce93d8',
           stroke: '#2a0a2a', strokeThickness: 4,
         }).setOrigin(0.5).setDepth(10 + md.row);
-        this.spawnNoiseProjectile(md, -1); // left
-        this.spawnNoiseProjectile(md, 1);  // right
+        // float up slowly and fade out
+        this.tweens.add({
+          targets: md.screamText, y: sc.y - 170, alpha: 0,
+          duration: 1200, ease: 'Quad.easeOut',
+          onComplete: () => {
+            if (md.screamText) { md.screamText.destroy(); md.screamText = null; }
+          },
+        });
+        this.spawnNoiseWave(md, -1); // left
+        this.spawnNoiseWave(md, 1);  // right
         if (!this.mandrakeGagged) {
           this.mandrakeGagged = true;
           this.startDialogue(SCRIPTS.mandrakeGag);
@@ -1846,13 +1859,14 @@ export default class BattleScene extends Phaser.Scene {
         this.time.delayedCall(350, () => {
           if (!md.alive) return;
           md.state = 'falling';
-          if (md.screamText) { md.screamText.destroy(); md.screamText = null; }
           this.tweens.add({
-            targets: md.sprite, y: md.homeY,
+            targets: md.sprite, y: airHomeY,
             duration: M.leapMs, ease: 'Quad.easeIn',
             onComplete: () => {
               if (!md.alive) return;
-              // LAND: re-plant
+              // LAND: back to ground origin (0.5, 0.9), re-plant
+              md.sprite.setOrigin(0.5, 0.9);
+              md.sprite.y = md.homeY;
               md.state = 'planted';
               md.sprite.setVisible(false);
               md.sprout.setVisible(true);
@@ -1864,29 +1878,30 @@ export default class BattleScene extends Phaser.Scene {
     });
   }
 
-  spawnNoiseProjectile(md, dir) {
-    // Curved zigzag line representing unpleasant noise. Travels horizontally.
+  spawnNoiseWave(md, dir) {
+    // Sound wave: vertical arc, endpoints toward the rootabreak, bulging
+    // outward — like a ripple tracing a circle around them.
     const g = this.add.graphics();
     const color = 0xce93d8;
-    g.lineStyle(3, color, 1);
-    // zigzag: 5 peaks across 48px, alternating up/down
-    const len = 48, peaks = 5, amp = 9;
-    let px = 0, py = 0;
-    for (let i = 1; i <= peaks * 2; i++) {
-      const nx = (len / (peaks * 2)) * i;
-      const ny = (i % 2 === 1) ? -amp : amp;
-      // curve: use quadratic with control point for rounded zigzag
-      g.lineBetween(px, py, nx, ny);
-      px = nx; py = ny;
+    g.lineStyle(4, color, 0.9);
+    // arc: radius 34, spanning ~100 degrees on the outer side
+    const radius = 34;
+    const halfAngle = Phaser.Math.DegToRad(50);
+    if (dir > 0) {
+      // right side: arc bulging right, center to the left (at rootabreak)
+      g.arc(radius, 0, radius, -halfAngle, halfAngle, false);
+    } else {
+      // left side: arc bulging left, center to the right
+      g.arc(-radius, 0, radius, Math.PI - halfAngle, Math.PI + halfAngle, false);
     }
+    g.strokePath();
     const p = tileCenter(md.col, md.row);
     g.setPosition(p.x, p.y - 40);
     g.setDepth(10 + md.row);
     g.setData('vx', dir * M.noiseSpeed);
     g.setData('row', md.row);
     g.setData('damage', M.screamDamage);
-    // flip for left-moving so the zigzag leads with the direction
-    if (dir < 0) g.setScale(-1, 1);
+    g.setData('expand', 0); // tracks expansion for the update loop
     this.enemyProjectiles.add(g);
   }
 
@@ -2141,6 +2156,13 @@ export default class BattleScene extends Phaser.Scene {
     for (const b of [...this.enemyProjectiles.getChildren()]) {
       if (!b.active) continue;
       b.x += b.getData('vx') * dt;
+      // sound waves expand as they travel (tracing a larger circle)
+      if (b.getData('expand') !== undefined) {
+        const ex = b.getData('expand') + dt * 1.2;
+        b.setData('expand', ex);
+        const s = 1 + ex * 0.6;
+        b.setScale(s);
+      }
       // destroy off-screen either side (noise travels both directions)
       if (b.x < -60 || b.x > 1020) { b.destroy(); continue; }
       // hits the navi if on her row and overlapping her tile
