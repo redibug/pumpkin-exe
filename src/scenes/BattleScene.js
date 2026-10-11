@@ -116,9 +116,8 @@ export default class BattleScene extends Phaser.Scene {
       this.game._bgm.setMute(!sound.enabled);
     }
     this._bgm = this.game._bgm; // alias for the M-key handler
-    const playBgm = () => { if (!this._bgm.isPlaying) this._bgm.play(); };
-    this.input.once('pointerdown', playBgm);
-    this.input.keyboard.once('keydown', playBgm);
+    // audio already unlocked from the title screen interaction — play immediately
+    if (!this._bgm.isPlaying) this._bgm.play();
 
     // ---- state ----
     this.naviHp = this._carriedHp; this.naviMaxHp = 100;
