@@ -50,9 +50,13 @@ export const NaviMethods = {
     // Rapid fire: keep firing while the key is held (started via JustDown below).
     // Uses the scene clock for timing to avoid stale `time` params.
     if (this.rapidFiring) {
-      const { slot, key } = this.rapidFiring;
-      if (!key.isDown || this.loadout[slot] !== 'rapid') {
-        this.rapidFiring = null; // key released or chip gone
+      const { slot, key, viaPad } = this.rapidFiring;
+      const pad = this.getPad?.();
+      const stillHeld = viaPad
+        ? (pad && pad.buttons[2]?.pressed)
+        : key.isDown;
+      if (!stillHeld || this.loadout[slot] !== 'rapid') {
+        this.rapidFiring = null; // released or chip gone
       } else if (this.time.now >= this.rapidNextShot) {
         this.fireRapidShot(slot);
       }
@@ -61,14 +65,14 @@ export const NaviMethods = {
     const front2Down = Phaser.Input.Keyboard.JustDown(this.chipFrontKey2);
     const padFront = this.padJustDown(pad, 2); // gamepad X
     if (frontDown || front2Down || padFront) {
-      this.pressChipKey(0, frontDown ? this.chipFrontKey : this.chipFrontKey2);
+      this.pressChipKey(0, frontDown ? this.chipFrontKey : this.chipFrontKey2, padFront);
     }
     const keyMap = [this.keys.ONE, this.keys.TWO, this.keys.THREE, this.keys.FOUR];
     keyMap.forEach((key, i) => {
       if (Phaser.Input.Keyboard.JustDown(key)) this.pressChipKey(i, key);
     });
   },
-  pressChipKey(i, key) {
+  pressChipKey(i, key, viaPad = false) {
     const chipId = this.loadout[i];
     if (!chipId) {
       if (i === 0) this.fireShoot(this.time.now); // out of chips: buster
@@ -77,16 +81,16 @@ export const NaviMethods = {
     if (chipId === 'rapid') {
       // don't restart if already firing this slot (e.g. pressing 1 while holding Z)
       if (this.rapidFiring && this.rapidFiring.slot === i) return;
-      this.startRapidFire(i, key);
+      this.startRapidFire(i, key, viaPad);
     } else {
       this.fireChipAt(i, this.time.now);
     }
   },
-  startRapidFire(slot, key) {
+  startRapidFire(slot, key, viaPad = false) {
     if (this.chipAmmo[slot] == null) {
       this.chipAmmo[slot] = CHIP_MAP.rapid.shots; // 10
     }
-    this.rapidFiring = { slot, key };
+    this.rapidFiring = { slot, key, viaPad };
     this.fireRapidShot(slot);
   },
   fireRapidShot(slot) {
