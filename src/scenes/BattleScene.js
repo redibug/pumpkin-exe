@@ -1840,16 +1840,17 @@ export default class BattleScene extends Phaser.Scene {
       onComplete: () => {
         if (!md.alive) return;
         // SCREAM at peak: KYAAH! floats up and fades, sound waves out
+        // (from the sprite's air position, not the ground)
         md.state = 'screaming';
-        const sc = tileCenter(md.col, md.row);
-        md.screamText = this.add.text(sc.x, sc.y - 110, 'KYAAH!', {
+        const sx = md.sprite.x, sy = md.sprite.y;
+        md.screamText = this.add.text(sx, sy - 60, 'KYAAH!', {
           fontFamily: 'monospace', fontSize: '22px', color: '#ce93d8',
           stroke: '#2a0a2a', strokeThickness: 4,
         }).setOrigin(0.5).setDepth(10 + md.row);
-        // float up slowly and fade out
+        // float up slowly and fade out (longer-lived)
         this.tweens.add({
-          targets: md.screamText, y: sc.y - 170, alpha: 0,
-          duration: 1200, ease: 'Quad.easeOut',
+          targets: md.screamText, y: sy - 130, alpha: 0,
+          duration: 1800, ease: 'Quad.easeOut',
           onComplete: () => {
             if (md.screamText) { md.screamText.destroy(); md.screamText = null; }
           },
@@ -1884,6 +1885,7 @@ export default class BattleScene extends Phaser.Scene {
   spawnNoiseWave(md, dir) {
     // Sound wave: vertical arc, endpoints toward the rootabreak, bulging
     // outward — like a ripple tracing a circle around them.
+    // Spawns at the sprite's air position with perspective scale.
     const g = this.add.graphics();
     const color = 0xce93d8;
     g.lineStyle(4, color, 0.9);
@@ -1898,13 +1900,17 @@ export default class BattleScene extends Phaser.Scene {
       g.arc(-radius, 0, radius, Math.PI - halfAngle, Math.PI + halfAngle, false);
     }
     g.strokePath();
-    const p = tileCenter(md.col, md.row);
-    g.setPosition(p.x, p.y - 40);
+    // perspective: match the sprite's scale (going forward, all projectiles
+    // should inherit perspective from their source)
+    const ps = md.sprite.scaleX;
+    g.setPosition(md.sprite.x, md.sprite.y);
+    g.setScale(ps);
     g.setDepth(10 + md.row);
     g.setData('vx', dir * M.noiseSpeed);
     g.setData('row', md.row);
     g.setData('damage', M.screamDamage);
     g.setData('expand', 0); // tracks expansion for the update loop
+    g.setData('baseScale', ps); // perspective scale (expansion multiplies this)
     this.enemyProjectiles.add(g);
   }
 
@@ -2148,10 +2154,14 @@ export default class BattleScene extends Phaser.Scene {
     const p = tileCenter(e.col, e.row);
     const bullet = this.add.circle(p.x - 20, p.y, 8, SKITTER.bulletColor);
     bullet.setDepth(10 + e.row);
+    // perspective: inherit from the shooter (going forward, all projectiles do this)
+    const ps = e.sprite.scaleX;
+    bullet.setScale(ps);
     bullet.setData('vx', -SKITTER.bulletSpeed);
     bullet.setData('row', e.row);
+    bullet.setData('damage', SKITTER.bulletDamage);
     this.enemyProjectiles.add(bullet);
-    this.tweens.add({ targets: bullet, scaleX: 1.4, scaleY: 1.4, duration: 120, yoyo: true });
+    this.tweens.add({ targets: bullet, scaleX: ps * 1.4, scaleY: ps * 1.4, duration: 120, yoyo: true });
   }
 
   updateEnemyProjectiles(delta) {
@@ -2160,11 +2170,12 @@ export default class BattleScene extends Phaser.Scene {
       if (!b.active) continue;
       b.x += b.getData('vx') * dt;
       // sound waves expand as they travel (tracing a larger circle)
+      // baseScale preserves the perspective scale
       if (b.getData('expand') !== undefined) {
         const ex = b.getData('expand') + dt * 1.2;
         b.setData('expand', ex);
-        const s = 1 + ex * 0.6;
-        b.setScale(s);
+        const base = b.getData('baseScale') ?? 1;
+        b.setScale(base * (1 + ex * 0.6));
       }
       // destroy off-screen either side (noise travels both directions)
       if (b.x < -60 || b.x > 1020) { b.destroy(); continue; }
