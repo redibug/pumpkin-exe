@@ -598,7 +598,7 @@ export default class BattleScene extends Phaser.Scene {
     return down && !was;
   }
   // Gamepad navigation for the custom screen.
-  // D-pad = move cursor, A = select/confirm, X = discard, B = cancel.
+  // D-pad = move cursor, A = select/confirm, X = discard.
   handleCustomPad() {
     const pad = this.getPad();
     if (!pad) return;
@@ -609,7 +609,7 @@ export default class BattleScene extends Phaser.Scene {
     else if (this.padJustDown(pad, 13)) this.handleCustomKey({ code: 'ArrowDown' });
     if (this.padJustDown(pad, 0)) this.handleCustomKey({ code: 'KeyZ' }); // A = select
     if (this.padJustDown(pad, 2)) this.handleCustomKey({ code: 'KeyX' }); // X = discard
-    if (this.padJustDown(pad, 1)) this.handleCustomKey({ code: 'Escape' }); // B = cancel
+
   }
   update(time, delta) {
     // visual follows run even when paused (don't affect game timing)

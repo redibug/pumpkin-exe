@@ -88,9 +88,7 @@ export const CustomScreenMethods = {
       case 'KeyX':
         if (cur.row === 0) this.toggleCustomDiscard();
         break;
-      case 'Escape':
-        this.cancelCustom();
-        return;
+
       default:
         return;
     }
@@ -152,10 +150,6 @@ export const CustomScreenMethods = {
     gone.forEach((i) => { this.hand[i] = null; });
     this.updateLoadoutHud();
     this.closeCustomUI();
-  },
-  cancelCustom() {
-    sound.chipCancel();
-    this.closeCustomUI(); // gauge stays spent, loadout unchanged
   },
   closeCustomUI() {
     sound.customClose();
