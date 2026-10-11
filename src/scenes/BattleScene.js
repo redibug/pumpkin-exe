@@ -97,11 +97,17 @@ export default class BattleScene extends Phaser.Scene {
     sound.init();
     this.input.once('pointerdown', () => sound.resume());
     this.input.keyboard.once('keydown', () => sound.resume());
-    this.input.keyboard.on('keydown-M', () => {
+    const toggleMute = () => {
       const on = sound.toggleMute();
       // also mute/unmute the background music
       if (this._bgm) this._bgm.setMute(!on);
-    });
+    };
+    this.input.keyboard.on('keydown-M', toggleMute);
+    this._mutePadCheck = () => {
+      const pad = this.getPad();
+      if (pad && this.padJustDown(pad, 8)) toggleMute(); // Select = mute
+    };
+    this.events.on('update', this._mutePadCheck);
     sound.battleStart();
     // background music: boss theme for PUMPKIN.EXE, battle theme otherwise.
     // Persisted on the game object so it keeps looping across battles
@@ -917,7 +923,17 @@ export default class BattleScene extends Phaser.Scene {
     sub.setShadow(0, 3, 'rgba(0,0,0,0.85)', 10, true, true);
     this.glitchIn(title, sub);
     // R retries the current battle, not the whole run
-    this.input.keyboard.once('keydown-R', () => this.scene.restart({ battleIndex: this.battleIndex }));
+    const retry = () => this.scene.restart({ battleIndex: this.battleIndex });
+    this.input.keyboard.once('keydown-R', retry);
+    // gamepad Start/A also retries
+    this._retryPadCheck = () => {
+      const pad = this.getPad();
+      if (pad && (this.padJustDown(pad, 9) || this.padJustDown(pad, 0))) {
+        this.events.off('update', this._retryPadCheck);
+        retry();
+      }
+    };
+    this.events.on('update', this._retryPadCheck);
   }
 
   showVictory() {
@@ -948,6 +964,16 @@ export default class BattleScene extends Phaser.Scene {
       });
     };
     this.input.keyboard.on('keydown', advance);
+    // gamepad A also advances
+    this._victoryPadCheck = () => {
+      const pad = this.getPad();
+      if (pad && this.padJustDown(pad, 0)) {
+        this.input.keyboard.off('keydown', advance);
+        this.events.off('update', this._victoryPadCheck);
+        advance({ code: 'KeyZ' });
+      }
+    };
+    this.events.on('update', this._victoryPadCheck);
   }
 }
 

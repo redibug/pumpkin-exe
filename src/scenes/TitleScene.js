@@ -24,6 +24,18 @@ export default class TitleScene extends Phaser.Scene {
     };
     this.input.once('pointerdown', startMus);
     this.input.keyboard.once('keydown', startMus);
+    // gamepad press also unlocks audio
+    this._titlePadMus = () => {
+      const pads = this.input.gamepad?.gamepads;
+      for (const p of pads || []) {
+        if (p && p.connected && p.buttons.some(b => b.pressed)) {
+          startMus();
+          this.events.off('update', this._titlePadMus);
+          break;
+        }
+      }
+    };
+    this.events.on('update', this._titlePadMus);
     // also catch clicks anywhere on the page (outside the canvas)
     const pageClick = () => { startMus(); document.removeEventListener('pointerdown', pageClick); };
     document.addEventListener('pointerdown', pageClick);
