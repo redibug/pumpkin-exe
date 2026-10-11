@@ -655,12 +655,18 @@ export default class BattleScene extends Phaser.Scene {
         const xs = corners.map((p) => p.x);
         if (b.x >= Math.min(...xs) && b.x <= Math.max(...xs)) { curCol = cc; break; }
       }
-      if (curCol >= 0 && curCol !== b.getData('hlCol')) {
+      const prevCol = b.getData('hlCol');
+      if (curCol !== prevCol) {
         const oldHl = b.getData('tileHighlight');
         if (oldHl && oldHl.active) oldHl.destroy();
-        const color = 0xff5252; // standard red telegraph (visible on pink tiles)
-        const newHl = this.highlightTile(curCol, brow, color, 0.25);
-        b.setData('tileHighlight', newHl);
+        b.setData('tileHighlight', null);
+        if (curCol >= 0) {
+          // wave is over a tile: highlight it
+          const color = 0xff5252; // standard red telegraph (visible on pink tiles)
+          const newHl = this.highlightTile(curCol, brow, color, 0.25);
+          b.setData('tileHighlight', newHl);
+        }
+        // if curCol is -1 (off the grid), no highlight — you can't be hit there
         b.setData('hlCol', curCol);
       }
       // sound waves expand as they travel (tracing a larger circle)
