@@ -46,8 +46,8 @@ export const PumpkinMethods = {
   },
   bossPhase(enemy) {
     const frac = enemy.hp / enemy.maxHp;
-    if (frac < 0.3) return BOSS.phases[2]; // Harvest
-    if (frac < 0.6) return BOSS.phases[1];  // Vine
+    if (frac < BOSS.phases[2].threshold) return BOSS.phases[2]; // Harvest
+    if (frac < BOSS.phases[1].threshold) return BOSS.phases[1];  // Vine
     return BOSS.phases[0];                  // Sprout
   },
   pumpkinAI(e, time) {

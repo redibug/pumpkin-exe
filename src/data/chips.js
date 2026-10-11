@@ -34,7 +34,7 @@ export const BOSS = {
   manualScale: 0.5,
   phases: [
     { threshold: 1.0, name: 'Sprout',  moveIntervalMs: 1400, attackIntervalMs: 2200 },
-    { threshold: 0.6, name: 'Vine',    moveIntervalMs: 1000, attackIntervalMs: 1700 },
-    { threshold: 0.3, name: 'Harvest', moveIntervalMs: 700,  attackIntervalMs: 1200 },
+    { threshold: 0.75, name: 'Vine',    moveIntervalMs: 1000, attackIntervalMs: 1700 },
+    { threshold: 0.5, name: 'Harvest', moveIntervalMs: 700,  attackIntervalMs: 1200 },
   ],
 };
