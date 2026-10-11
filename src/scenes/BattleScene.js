@@ -32,11 +32,9 @@ const SENTRY_MANUAL = 3;
 
 const BOMB_SPIDER = {
   maxHp: 70,
-  moveIntervalMs: 2600,   // walks in random directions
-  throwIntervalMs: 5200,  // throws bomb at regular intervals
+  moveIntervalMs: 2600,   // cycle: move -> move -> throw -> repeat
   bombDamage: 20,
   throwDistance: 3,       // tiles forward (toward the player)
-  reloadMs: 2000,         // bomb reappears on back after throw
 };
 const BOMB_SPIDER_MANUAL = 1;
 
@@ -491,8 +489,8 @@ export default class BattleScene extends Phaser.Scene {
       type: 'bombspider', sprite, bombBack, col, row,
       hp: BOMB_SPIDER.maxHp, maxHp: BOMB_SPIDER.maxHp, alive: true,
       nextMove: 0,
-      nextThrow: -1, // init on first AI run (don't throw immediately)
-      hasBomb: true, // false while the thrown bomb is in the air / reloading
+      movesDone: 0, // cycle: move -> move -> throw -> repeat
+      hasBomb: true, // false while the thrown bomb is in the air
       hpBar: this.makeHpBar(),
     };
     this.enemies.push(enemy);
@@ -775,12 +773,12 @@ export default class BattleScene extends Phaser.Scene {
     JD(this.shootKey); JD(this.chipFrontKey); JD(this.chipFrontKey2); JD(this.enterKey);
     Object.values(this.keys).forEach(JD);
     this.setPaused(false);
-    // Grace period: bomb spiders hold their throw briefly after the custom
-    // screen closes (don't punish the player immediately)
-    const now = this.time.now;
+    // Grace period: bomb spiders restart their move cycle after the custom
+    // screen (don't throw immediately)
     for (const e of this.enemies) {
-      if (e.type === 'bombspider' && e.alive && e.nextThrow > 0) {
-        e.nextThrow = Math.max(e.nextThrow, now + 2000);
+      if (e.type === 'bombspider' && e.alive) {
+        e.movesDone = 0;
+        e.nextMove = this.time.now + 2000;
       }
     }
   }
@@ -1856,29 +1854,32 @@ export default class BattleScene extends Phaser.Scene {
       e.bombBack.setVisible(e.hasBomb && e.sprite.visible);
       if (e.hasBomb && e.sprite.visible) this.positionBombBack(e);
     }
-    // init throw timer on first run (don't throw immediately)
-    if (e.nextThrow < 0) e.nextThrow = time + BOMB_SPIDER.throwIntervalMs;
-    // Walk: try all 4 directions in random order until one works
+    // Cycle: move -> move -> throw -> repeat
     if (time >= e.nextMove) {
       e.nextMove = time + BOMB_SPIDER.moveIntervalMs;
-      const dirs = Phaser.Utils.Array.Shuffle([[-1, 0], [1, 0], [0, -1], [0, 1]]);
-      for (const [dc, dr] of dirs) {
-        const nc = Phaser.Math.Clamp(e.col + dc, 3, 5);
-        const nr = Phaser.Math.Clamp(e.row + dr, 0, ROWS - 1);
-        if (nc !== e.col || nr !== e.row) {
-          e.col = nc; e.row = nr;
-          this.teleportMove(e.sprite, e.col, e.row, BOMB_SPIDER_MANUAL, () => {
-            this.positionBombBack(e);
-          });
-          this.positionBombBack(e);
-          break;
+      if (e.movesDone >= 2) {
+        // time to throw (if carrying the bomb)
+        if (e.hasBomb) {
+          this.throwBomb(e);
         }
+        e.movesDone = 0;
+      } else {
+        // do a move: try all 4 directions in random order
+        const dirs = Phaser.Utils.Array.Shuffle([[-1, 0], [1, 0], [0, -1], [0, 1]]);
+        for (const [dc, dr] of dirs) {
+          const nc = Phaser.Math.Clamp(e.col + dc, 3, 5);
+          const nr = Phaser.Math.Clamp(e.row + dr, 0, ROWS - 1);
+          if (nc !== e.col || nr !== e.row) {
+            e.col = nc; e.row = nr;
+            this.teleportMove(e.sprite, e.col, e.row, BOMB_SPIDER_MANUAL, () => {
+              this.positionBombBack(e);
+            });
+            this.positionBombBack(e);
+            break;
+          }
+        }
+        e.movesDone++;
       }
-    }
-    // Throw: at regular intervals, if carrying the bomb
-    if (e.hasBomb && time >= e.nextThrow) {
-      e.nextThrow = time + BOMB_SPIDER.throwIntervalMs;
-      this.throwBomb(e);
     }
   }
 
@@ -1888,6 +1889,17 @@ export default class BattleScene extends Phaser.Scene {
     // target: 3 tiles forward (toward player), same row; clamp to grid
     const targetCol = Math.max(0, e.col - BOMB_SPIDER.throwDistance);
     const targetRow = e.row;
+    // red warning indicators on the affected tiles (plus-shape)
+    const warns = [];
+    const tiles = [[targetCol, targetRow],
+      [targetCol - 1, targetRow], [targetCol + 1, targetRow],
+      [targetCol, targetRow - 1], [targetCol, targetRow + 1]];
+    for (const [c, r] of tiles) {
+      if (c >= 0 && c < COLS && r >= 0 && r < ROWS) {
+        warns.push(this.highlightTile(c, r, 0xff3b30, 0.35));
+      }
+    }
+    e.bombWarns = warns;
     const startX = e.sprite.x, startY = e.sprite.y - e.sprite.displayHeight * 0.7;
     const end = tileFeet(targetCol, targetRow);
     // flying bomb: same art, fuse anim, rotates slowly in flight
@@ -1896,9 +1908,9 @@ export default class BattleScene extends Phaser.Scene {
     bomb.setScale(e.sprite.scaleX * 0.9);
     bomb.setDepth(20); // above everything while flying
     const proxy = { t: 0 };
-    const arcH = 130; // arc height in px
+    const arcH = 190; // higher arc
     this.tweens.add({
-      targets: proxy, t: 1, duration: 750, ease: 'Linear',
+      targets: proxy, t: 1, duration: 1050, ease: 'Linear', // longer flight
       onUpdate: () => {
         const t = proxy.t;
         const x = startX + (end.x - startX) * t;
@@ -1912,6 +1924,11 @@ export default class BattleScene extends Phaser.Scene {
 
   landBomb(bomb, col, row, e) {
     bomb.destroy();
+    // clear the warning indicators
+    if (e.bombWarns) {
+      e.bombWarns.forEach((w) => w.destroy());
+      e.bombWarns = null;
+    }
     // explosion flash on the landing tile
     const c = tileCenter(col, row);
     const boom = this.add.circle(c.x, c.y, 10, 0xff6f00).setDepth(20);
@@ -1927,13 +1944,12 @@ export default class BattleScene extends Phaser.Scene {
       this.damageNavi(BOMB_SPIDER.bombDamage);
       this.flash(this.navi, 0xff6f00);
     }
-    // reload: bomb reappears on the back after a delay
-    this.time.delayedCall(BOMB_SPIDER.reloadMs, () => {
-      if (!e.alive) return;
+    // reload: bomb readied immediately on explosion
+    if (e.alive) {
       e.hasBomb = true;
       this.positionBombBack(e);
       e.bombBack.setVisible(true);
-    });
+    }
   }
 
   spitIchor(e) {
@@ -2017,6 +2033,7 @@ export default class BattleScene extends Phaser.Scene {
       if (e.mound) e.mound.setVisible(false);
       if (e.sensor) { this.tweens.killTweensOf(e.sensor); e.sensor.setVisible(false); }
       if (e.bombBack) { e.bombBack.destroy(); e.bombBack = null; }
+      if (e.bombWarns) { e.bombWarns.forEach((w) => w.destroy()); e.bombWarns = null; }
       this.tweens.killTweensOf(e.sprite); // stop idle/shoot tweens
       if (e.bobTween) e.bobTween.stop(); // stop the infinite idle bob
       // abort mid-teleport: clear the flag (tick sees it and cleans up),
