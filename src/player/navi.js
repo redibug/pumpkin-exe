@@ -163,12 +163,15 @@ export const NaviMethods = {
   },
   showPunchFrame() {
     if (this._punchT) return;
+    // Don't do the position-tween punch while teleporting — it fights
+    // with placeFighter over navi.x and leaves a visual/logical desync.
+    if (this.navi.getData('teleporting')) return;
     const hasPunch = this.textures.exists('bugchan-punch');
     if (hasPunch) {
       this.navi.anims.pause();
       this.navi.setTexture('bugchan-punch');
     } else {
-      this.tweens.add({ targets: this.navi, x: this.navi.x + 8, duration: 60, yoyo: true });
+      this._punchXTween = this.tweens.add({ targets: this.navi, x: this.navi.x + 8, duration: 60, yoyo: true });
     }
     this._punchT = this.time.delayedCall(130, () => {
       this._punchT = null;

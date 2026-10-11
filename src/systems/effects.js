@@ -7,6 +7,9 @@ import { sound } from './sound.js';
 export const EffectsMethods = {
   teleportMove(sprite, col, row, manual, onDone) {
     sound.teleport();
+    // Kill any position tween (e.g. punch-frame nudge) so it doesn't
+    // fight placeFighter over the sprite's x/y.
+    this.tweens.killTweensOf(sprite);
     if (sprite.getData('teleporting')) {
       this.placeFighter(sprite, col, row, manual); // fallback: instant pop
       if (onDone) onDone();
