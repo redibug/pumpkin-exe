@@ -2118,42 +2118,45 @@ export default class BattleScene extends Phaser.Scene {
 
   // Fancy title with vertical gradient, stroke, and blurred drop shadow.
   // Drawn on a canvas for the gradient; returns an Image.
+  // Reuses the texture if it already exists (e.g. across battles).
   makeFancyTitle(x, y, text, gradTop, gradBottom, strokeColor) {
     const fontSize = 56;
     const key = `title-${text.replace(/\s/g, '_')}`;
-    // measure text width via a temp canvas
-    const meas = this.textures.createCanvas('__meas', 4, 4);
-    const mctx = meas.getContext();
-    mctx.font = `bold ${fontSize}px monospace`;
-    const tw = Math.ceil(mctx.measureText(text).width);
-    this.textures.remove('__meas');
-    const pad = 24;
-    const cw = tw + pad * 2, ch = fontSize + pad * 2;
-    const tex = this.textures.createCanvas(key, cw, ch);
-    const ctx = tex.getContext();
-    ctx.font = `bold ${fontSize}px monospace`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const cx = cw / 2, cy = ch / 2;
-    // blurred dark drop shadow (drawn first, offset down)
-    ctx.shadowColor = 'rgba(0,0,0,0.85)';
-    ctx.shadowBlur = 14;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 5;
-    // gradient fill
-    const grad = ctx.createLinearGradient(0, cy - fontSize / 2, 0, cy + fontSize / 2);
-    grad.addColorStop(0, gradTop);
-    grad.addColorStop(1, gradBottom);
-    ctx.fillStyle = grad;
-    ctx.fillText(text, cx, cy);
-    // stroke on top (no shadow for the stroke)
-    ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = strokeColor;
-    ctx.strokeText(text, cx, cy);
-    tex.refresh();
+    if (!this.textures.exists(key)) {
+      // measure text width via a temp canvas
+      const meas = this.textures.createCanvas('__meas', 4, 4);
+      const mctx = meas.getContext();
+      mctx.font = `bold ${fontSize}px monospace`;
+      const tw = Math.ceil(mctx.measureText(text).width);
+      this.textures.remove('__meas');
+      const pad = 24;
+      const cw = tw + pad * 2, ch = fontSize + pad * 2;
+      const tex = this.textures.createCanvas(key, cw, ch);
+      const ctx = tex.getContext();
+      ctx.font = `bold ${fontSize}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const cx = cw / 2, cy = ch / 2;
+      // blurred dark drop shadow (drawn first, offset down)
+      ctx.shadowColor = 'rgba(0,0,0,0.85)';
+      ctx.shadowBlur = 14;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 5;
+      // gradient fill
+      const grad = ctx.createLinearGradient(0, cy - fontSize / 2, 0, cy + fontSize / 2);
+      grad.addColorStop(0, gradTop);
+      grad.addColorStop(1, gradBottom);
+      ctx.fillStyle = grad;
+      ctx.fillText(text, cx, cy);
+      // stroke on top (no shadow for the stroke)
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = strokeColor;
+      ctx.strokeText(text, cx, cy);
+      tex.refresh();
+    }
     const img = this.add.image(x, y, key).setDepth(100);
     return img;
   }
