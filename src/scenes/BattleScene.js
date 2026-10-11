@@ -30,11 +30,22 @@ const SENTRY = {
 };
 const SENTRY_MANUAL = 3;
 
+const BOMB_SPIDER = {
+  maxHp: 70,
+  moveIntervalMs: 2600,   // walks in random directions
+  throwIntervalMs: 5200,  // throws bomb at regular intervals
+  bombDamage: 20,
+  throwDistance: 3,       // tiles forward (toward the player)
+  reloadMs: 2000,         // bomb reappears on back after throw
+};
+const BOMB_SPIDER_MANUAL = 1;
+
 // Per-enemy-type auto-scale: longest texture side auto-shrinks to fit.
 // Unlisted types use the default FIT_MAX (512).
 const AUTOSCALE = {
   skitterbug: 120,
   sentry: 120,
+  bombspider: 140,
 };
 
 // ---- battles ----
@@ -179,6 +190,8 @@ export default class BattleScene extends Phaser.Scene {
     this.load.image('mandrake', 'assets/sprites/viruses/virus-rutabaga-mandrake.png');
     this.load.image('skitterbug', 'assets/sprites/viruses/virus-skitterbug.png');
     this.load.image('sentry', 'assets/sprites/viruses/virus-sentry-clean.png');
+    this.load.image('bomb-spider', 'assets/sprites/viruses/bomb spider.png');
+    this.load.spritesheet('bomb', 'assets/sprites/viruses/bomb.png', { frameWidth: 64, frameHeight: 64 });
     this.load.image('bg', 'assets/tiles/bg-cyberspace.png');
     this.load.image('chip-cannon', 'assets/ui/chip-cannon.png');
     this.load.image('chip-sword', 'assets/ui/chip-sword.png');
@@ -236,6 +249,12 @@ export default class BattleScene extends Phaser.Scene {
     this.anims.create({
       key: 'bugchan-idle',
       frames: this.anims.generateFrameNumbers('bugchan', { start: 0, end: 7 }),
+      frameRate: 8,
+      repeat: -1,
+    });
+    this.anims.create({
+      key: 'bomb-fuse',
+      frames: this.anims.generateFrameNumbers('bomb', { start: 0, end: 1 }),
       frameRate: 8,
       repeat: -1,
     });
@@ -429,6 +448,44 @@ export default class BattleScene extends Phaser.Scene {
     };
     this.enemies.push(enemy);
     return enemy;
+  }
+
+  spawnBombSpider(col, row) {
+    // Bomb Spider (rebranded Jack): walks randomly, carries a bomb on its
+    // back. At intervals it throws the bomb 3 tiles forward (toward player);
+    // on landing it damages the 3x3 area. Bomb is composited in-engine:
+    // a separate sprite on the back (hidden while thrown).
+    const sprite = this.physics.add.sprite(0, 0, 'bomb-spider');
+    sprite.setData('fitMax', AUTOSCALE.bombspider ?? FIT_MAX);
+    sprite.setOrigin(0.5, 1);
+    this.placeFighter(sprite, col, row, BOMB_SPIDER_MANUAL);
+    // bomb on the back: sits on top of the spider, plays fuse animation
+    const bombBack = this.add.sprite(0, 0, 'bomb');
+    bombBack.play('bomb-fuse');
+    bombBack.setOrigin(0.5, 1);
+    // scale bomb relative to spider (bomb art is 64px, spider is 128px wide)
+    const bombScale = sprite.scaleX * 0.9;
+    bombBack.setScale(bombScale);
+    bombBack.setDepth(sprite.depth + 0.5);
+    this.positionBombBack({ sprite, bombBack });
+    const enemy = {
+      type: 'bombspider', sprite, bombBack, col, row,
+      hp: BOMB_SPIDER.maxHp, maxHp: BOMB_SPIDER.maxHp, alive: true,
+      nextMove: 0,
+      nextThrow: 0,
+      hasBomb: true, // false while the thrown bomb is in the air / reloading
+      hpBar: this.makeHpBar(),
+    };
+    this.enemies.push(enemy);
+    return enemy;
+  }
+
+  // Position the back-bomb on top of the spider
+  positionBombBack(e) {
+    const s = e.sprite;
+    // bomb bottom sits on the spider's top, with slight overlap
+    e.bombBack.setPosition(s.x, s.y - s.displayHeight + e.bombBack.displayHeight * 0.25);
+    e.bombBack.setDepth(s.depth + 0.5);
   }
 
   // HP number floating above an enemy's head
@@ -1565,6 +1622,7 @@ export default class BattleScene extends Phaser.Scene {
       else if (e.type === 'mandrake') this.mandrakeAI(e, time);
       else if (e.type === 'skitterbug') this.skitterbugAI(e, time);
       else if (e.type === 'sentry') this.sentryAI(e, time);
+      else if (e.type === 'bombspider') this.bombSpiderAI(e, time);
     }
   }
 
@@ -1760,6 +1818,89 @@ export default class BattleScene extends Phaser.Scene {
     }
   }
 
+  bombSpiderAI(e, time) {
+    // keep the back-bomb synced: follows the sprite, hides when teleporting
+    if (e.bombBack) {
+      e.bombBack.setVisible(e.hasBomb && e.sprite.visible);
+      if (e.hasBomb && e.sprite.visible) this.positionBombBack(e);
+    }
+    // Walk: random direction every few seconds (teleport, like skitterbug)
+    if (time >= e.nextMove) {
+      e.nextMove = time + BOMB_SPIDER.moveIntervalMs;
+      // random neighboring tile in enemy columns (3-5), any row
+      const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+      const [dc, dr] = dirs[(Math.random() * dirs.length) | 0];
+      const nc = Phaser.Math.Clamp(e.col + dc, 3, 5);
+      const nr = Phaser.Math.Clamp(e.row + dr, 0, ROWS - 1);
+      if (nc !== e.col || nr !== e.row) {
+        e.col = nc; e.row = nr;
+        this.teleportMove(e.sprite, e.col, e.row, BOMB_SPIDER_MANUAL, () => {
+          this.positionBombBack(e);
+        });
+        // move the back-bomb immediately too (it follows the sprite)
+        this.positionBombBack(e);
+      }
+    }
+    // Throw: at regular intervals, if carrying the bomb
+    if (e.hasBomb && time >= e.nextThrow) {
+      e.nextThrow = time + BOMB_SPIDER.throwIntervalMs;
+      this.throwBomb(e);
+    }
+  }
+
+  throwBomb(e) {
+    e.hasBomb = false;
+    e.bombBack.setVisible(false);
+    // target: 3 tiles forward (toward player), same row; clamp to grid
+    const targetCol = Math.max(0, e.col - BOMB_SPIDER.throwDistance);
+    const targetRow = e.row;
+    const startX = e.sprite.x, startY = e.sprite.y - e.sprite.displayHeight * 0.7;
+    const end = tileFeet(targetCol, targetRow);
+    // flying bomb: same art, fuse anim, rotates slowly in flight
+    const bomb = this.add.sprite(startX, startY, 'bomb');
+    bomb.play('bomb-fuse');
+    bomb.setScale(e.sprite.scaleX * 0.9);
+    bomb.setDepth(20); // above everything while flying
+    const proxy = { t: 0 };
+    const arcH = 130; // arc height in px
+    this.tweens.add({
+      targets: proxy, t: 1, duration: 750, ease: 'Linear',
+      onUpdate: () => {
+        const t = proxy.t;
+        const x = startX + (end.x - startX) * t;
+        const y = startY + (end.y - startY) * t - Math.sin(t * Math.PI) * arcH;
+        bomb.setPosition(x, y);
+        bomb.angle += 5; // slow rotation
+      },
+      onComplete: () => this.landBomb(bomb, targetCol, targetRow, e),
+    });
+  }
+
+  landBomb(bomb, col, row, e) {
+    bomb.destroy();
+    // explosion flash on the landing tile
+    const c = tileCenter(col, row);
+    const boom = this.add.circle(c.x, c.y, 10, 0xff6f00).setDepth(20);
+    this.tweens.add({
+      targets: boom, scaleX: 4, scaleY: 2.5, alpha: 0,
+      duration: 280, ease: 'Quad.easeOut',
+      onComplete: () => boom.destroy(),
+    });
+    // damage: landing tile + all adjacent (3x3)
+    const nc = this.naviPos.col, nr = this.naviPos.row;
+    if (Math.abs(nc - col) <= 1 && Math.abs(nr - row) <= 1) {
+      this.damageNavi(BOMB_SPIDER.bombDamage);
+      this.flash(this.navi, 0xff6f00);
+    }
+    // reload: bomb reappears on the back after a delay
+    this.time.delayedCall(BOMB_SPIDER.reloadMs, () => {
+      if (!e.alive) return;
+      e.hasBomb = true;
+      this.positionBombBack(e);
+      e.bombBack.setVisible(true);
+    });
+  }
+
   spitIchor(e) {
     // shoot animation: rear up (squash), then snap forward as the bullet fires
     const s = e.sprite;
@@ -1840,6 +1981,7 @@ export default class BattleScene extends Phaser.Scene {
       if (e.warnRect) { e.warnRect.destroy(); e.warnRect = null; }
       if (e.mound) e.mound.setVisible(false);
       if (e.sensor) { this.tweens.killTweensOf(e.sensor); e.sensor.setVisible(false); }
+      if (e.bombBack) { e.bombBack.destroy(); e.bombBack = null; }
       this.tweens.killTweensOf(e.sprite); // stop idle/shoot tweens
       if (e.bobTween) e.bobTween.stop(); // stop the infinite idle bob
       // abort mid-teleport: clear the flag (tick sees it and cleans up),
