@@ -26,8 +26,8 @@ export const BOMB_SPIDER = {
   id: 'bombspider',
   name: 'BOMB SPIDER',
   maxHp: 140,
-  moveIntervalMs: 1600,   // cycle: move -> move -> throw -> repeat
-  movesBeforeThrow: 3,    // moves per cycle before throwing
+  moveIntervalMs: 800,   // cycle: move -> move -> throw -> repeat
+  movesBeforeThrow: 4,    // moves per cycle before throwing
   throwGraceMs: 4000,     // no throwing for this long after battle start
   bombDamage: 20,
   throwDistance: 3,       // tiles forward (toward the player)
