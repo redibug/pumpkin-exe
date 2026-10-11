@@ -591,6 +591,20 @@ export default class BattleScene extends Phaser.Scene {
     this[key] = down;
     return down && !was;
   }
+  // Gamepad navigation for the custom screen.
+  // D-pad = move cursor, A = select/confirm, X = discard, B = cancel.
+  handleCustomPad() {
+    const pad = this.getPad();
+    if (!pad) return;
+    // D-pad with edge detection (buttons 12=up, 13=down, 14=left, 15=right)
+    if (this.padJustDown(pad, 14)) this.handleCustomKey({ code: 'ArrowLeft' });
+    else if (this.padJustDown(pad, 15)) this.handleCustomKey({ code: 'ArrowRight' });
+    else if (this.padJustDown(pad, 12)) this.handleCustomKey({ code: 'ArrowUp' });
+    else if (this.padJustDown(pad, 13)) this.handleCustomKey({ code: 'ArrowDown' });
+    if (this.padJustDown(pad, 0)) this.handleCustomKey({ code: 'KeyZ' }); // A = select
+    if (this.padJustDown(pad, 2)) this.handleCustomKey({ code: 'KeyX' }); // X = discard
+    if (this.padJustDown(pad, 1)) this.handleCustomKey({ code: 'Escape' }); // B = cancel
+  }
   update(time, delta) {
     // visual follows run even when paused (don't affect game timing)
     this.syncBombBacks();
@@ -599,7 +613,7 @@ export default class BattleScene extends Phaser.Scene {
       this.dialogue.update(delta);
       return;
     }
-    if (this.customOpen) return; // custom screen owns the frame (game paused)
+    if (this.customOpen) { this.handleCustomPad(); return; } // custom screen owns the frame (game paused)
     if (this.over) return;
     // custom gauge fills during battle; SHIFT opens the custom screen
     if (this.customTimer < CUSTOM_GAUGE_MS) {
