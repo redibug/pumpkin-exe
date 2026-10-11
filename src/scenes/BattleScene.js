@@ -405,15 +405,19 @@ export default class BattleScene extends Phaser.Scene {
     this.placeFighter(sprite, col, row, MANDRAKE_MANUAL * (big ? 1.35 : 1));
     // override placeFighter's feet positioning: center on the tile
     sprite.setPosition(mc.x, mc.y);
+    // align sprout's bottom with the main sprite's bottom (different sizes,
+    // same origin) so the plant/replant transition doesn't jump
+    const sproutY = sprite.y + 0.1 * (sprite.displayHeight - sprout.displayHeight);
+    sprout.setPosition(mc.x, sproutY);
     // store the home position for the leap (sprite returns here)
     const homeY = sprite.y;
     const maxHp = big ? M.maxHp * 2 : M.maxHp;
     const enemy = {
-      type: 'rootabreak', sprite, sprout, col, row, homeY,
+      type: 'rootabreak', sprite, sprout, col, row, homeY, sproutY,
       hp: maxHp, maxHp, alive: true, big,
       state: 'planted', // planted | leaping | screaming | falling
       nextJump: -1, // init on first AI tick (column-synced)
-      screamText: null,
+      screamText: null, wiggleTween: null,
       hpBar: this.makeHpBar(),
     };
     this.enemies.push(enemy);
@@ -1242,7 +1246,10 @@ export default class BattleScene extends Phaser.Scene {
       if (e.type === 'rootabreak') {
         const mc = tileCenter(e.col, e.row);
         const mp = tileFeet(e.col, e.row);
-        e.sprout.setPosition(mc.x, mc.y).setScale(mp.s * 0.9).setDepth(9 + e.row);
+        // keep sprout bottom-aligned with the main sprite
+        const sproutY = mc.y + 0.1 * (e.sprite.displayHeight - e.sprout.displayHeight);
+        e.sprout.setPosition(mc.x, sproutY).setScale(mp.s * 0.9).setDepth(9 + e.row);
+        e.sproutY = sproutY;
       }
     }
   }
@@ -1833,6 +1840,11 @@ export default class BattleScene extends Phaser.Scene {
       targets: md.sprite, scaleX: targetScale, scaleY: targetScale,
       duration: 150, ease: 'Back.easeOut',
     });
+    // wiggle while airborne: gentle rotation
+    md.wiggleTween = this.tweens.add({
+      targets: md.sprite, angle: 6,
+      duration: 200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+    });
     // leap up
     this.tweens.add({
       targets: md.sprite, y: airHomeY - M.leapHeightPx,
@@ -1884,11 +1896,29 @@ export default class BattleScene extends Phaser.Scene {
             duration: M.leapMs, ease: 'Quad.easeIn',
             onComplete: () => {
               if (!md.alive) return;
-              // LAND: re-plant
-              md.state = 'planted';
-              md.sprite.setVisible(false);
-              md.sprout.setVisible(true);
-              md.nextJump = this.time.now + M.plantedMs + (md.col - 3) * M.columnDelayMs;
+              // stop the wiggle
+              if (md.wiggleTween) { md.wiggleTween.stop(); md.wiggleTween = null; }
+              md.sprite.setAngle(0);
+              // LAND: scale down (reverse of pop-in), then re-plant
+              this.tweens.add({
+                targets: md.sprite, scaleX: 0, scaleY: 0,
+                duration: 130, ease: 'Quad.easeIn',
+                onComplete: () => {
+                  if (!md.alive) return;
+                  md.state = 'planted';
+                  md.sprite.setVisible(false);
+                  // sprout pops in at the bottom-aligned position
+                  md.sprout.setPosition(md.sprite.x, md.sproutY).setVisible(true);
+                  const ss = md.sprout.scaleX || 1;
+                  // (scale was left intact; pop from 0 for the transition)
+                  md.sprout.setScale(0);
+                  this.tweens.add({
+                    targets: md.sprout, scaleX: ss, scaleY: ss,
+                    duration: 160, ease: 'Back.easeOut',
+                  });
+                  md.nextJump = this.time.now + M.plantedMs + (md.col - 3) * M.columnDelayMs;
+                },
+              });
             },
           });
         });
@@ -2226,6 +2256,8 @@ export default class BattleScene extends Phaser.Scene {
       if (e.warnRect) { e.warnRect.destroy(); e.warnRect = null; }
       if (e.sprout) e.sprout.setVisible(false);
       if (e.screamText) { e.screamText.destroy(); e.screamText = null; }
+      if (e.wiggleTween) { e.wiggleTween.stop(); e.wiggleTween = null; }
+      e.sprite.setAngle(0);
       if (e.sensor) { this.tweens.killTweensOf(e.sensor); e.sensor.setVisible(false); }
       if (e.bombBack) { e.bombBack.destroy(); e.bombBack = null; }
       if (e.bombWarns) { e.bombWarns.forEach((w) => w.destroy()); e.bombWarns = null; }
