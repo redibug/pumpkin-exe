@@ -20,6 +20,7 @@ export const PumpkinMethods = {
       hp: BOSS.maxHp, maxHp: BOSS.maxHp, alive: true,
       nextMove: 0, nextAttack: 0,
       nextTwitch: 0, // set on first AI tick
+      nextSentrySummon: 0,
       lastPhase: null,
       hpBar: this.makeHpBar(),
     };
@@ -51,8 +52,22 @@ export const PumpkinMethods = {
   },
   pumpkinAI(e, time) {
     const phase = this.bossPhase(e);
-    // dramatic sting on phase change
-    if (e.lastPhase && e.lastPhase !== phase) sound.battleStart();
+    // dramatic sting + summon a rootabreak on phase change (Vine & Harvest)
+    if (e.lastPhase && e.lastPhase !== phase) {
+      sound.battleStart();
+      // spawn a rootabreak on a free enemy-side tile
+      const freeTiles = [];
+      for (let c = 3; c <= 5; c++) {
+        for (let r = 0; r < ROWS; r++) {
+          const occupied = this.enemies.some((o) => o.alive && o.col === c && o.row === r);
+          if (!occupied) freeTiles.push({ col: c, row: r });
+        }
+      }
+      if (freeTiles.length > 0) {
+        const spot = Phaser.Utils.Array.GetRandom(freeTiles);
+        this.spawnRootabreak(spot.col, spot.row, false);
+      }
+    }
     e.lastPhase = phase;
 
     // rare unnerving twitch: sudden jerk with no easing, then still
@@ -128,6 +143,16 @@ export const PumpkinMethods = {
           },
         });
       });
+    }
+
+    // HARVEST ONLY: if on the navi's row, summon a disposable sentry
+    // in the back row, already winding up to fire
+    if (phase === BOSS.phases[2] && e.row === this.naviPos.row && time >= e.nextSentrySummon) {
+      e.nextSentrySummon = time + 4000;
+      const sentry = this.spawnSentry(5, e.row);
+      sentry.summoned = true; // deletes itself after firing
+      sentry.hpBar.setVisible(false); // it's an attack, not an enemy
+      sound.teleport();
     }
   }
 };

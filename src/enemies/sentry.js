@@ -63,6 +63,15 @@ export const SentryMethods = {
     this.time.delayedCall(SENTRY.telegraphMs, () => {
       if (!e.alive || this.over) { e.state = 'ready'; e.sensor.setVisible(false); return; }
       this.fireSentryLaser(e);
+      // summoned sentries (boss attack) delete themselves after firing
+      if (e.summoned) {
+        e.alive = false;
+        if (e.sensor) { this.tweens.killTweensOf(e.sensor); e.sensor.destroy(); }
+        if (e.hpBar) e.hpBar.setVisible(false);
+        this.tweens.killTweensOf(e.sprite);
+        e.sprite.destroy();
+        return;
+      }
       e.state = 'cooldown';
       e.cooldownUntil = this.time.now + SENTRY.cooldownMs;
       e.sensor.setVisible(false);
