@@ -520,14 +520,15 @@ export default class BattleScene extends Phaser.Scene {
 
   // Position the back-bomb at the spider's abdomen, layered behind.
   // Offset up and to the right so it peeks out from behind the body.
-  // Scale follows the spider's perspective scale.
+  // Scale follows the spider's perspective scale AND idle squash.
   positionBombBack(e) {
     const s = e.sprite;
     e.bombBack.setPosition(
       s.x + s.displayWidth * 0.28,
       s.y - s.displayHeight * 0.72
     );
-    e.bombBack.setScale(s.scaleX * 0.9); // perspective-matched
+    // inherit the spider's current scale (incl. squash) on both axes
+    e.bombBack.setScale(s.scaleX * 0.9, s.scaleY * 0.9);
     e.bombBack.setDepth(s.depth - 0.5); // behind the spider
   }
 
