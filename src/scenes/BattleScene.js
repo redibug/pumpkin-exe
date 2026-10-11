@@ -26,9 +26,6 @@ import { NaviMethods, NAVI_MANUAL } from '../player/navi.js';
 // ---- battles ----
 // Mel: edit freely — enemy comps, names, dialogue. Simple words, short lines.
 
-// Manual artistic scales on top of the auto-fit + perspective scale.
-const BOSS_MANUAL = 0.5;
-
 // ---- custom screen config lives in src/ui/customScreen.js ----
 
 // ---- glassy tile palette (base colors live in grid-config.json) ----
@@ -410,7 +407,7 @@ export default class BattleScene extends Phaser.Scene {
     this.drawGrid();
     this.placeFighter(this.navi, this.naviPos.col, this.naviPos.row, NAVI_MANUAL);
     for (const e of this.enemies) {
-      const manual = e.type === 'pumpkin' ? BOSS_MANUAL : ROOTABREAK.manualScale * (e.big ? 1.35 : 1);
+      const manual = e.type === 'pumpkin' ? BOSS.manualScale : ROOTABREAK.manualScale * (e.big ? 1.35 : 1);
       if (e.type === 'rootabreak' && !e.sprite.visible) continue;
       this.placeFighter(e.sprite, e.col, e.row, manual);
       if (e.type === 'rootabreak') {

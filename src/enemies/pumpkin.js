@@ -5,6 +5,7 @@ import { COLS, ROWS, project, tileCorners, tileFeet, tileCenter } from '../syste
 import { SKITTER, SENTRY, BOMB_SPIDER, ROOTABREAK, AUTOSCALE } from '../data/viruses.js';
 import { FIT_MAX } from '../systems/spriteFit.js';
 import { SCRIPTS } from '../systems/dialogue.js';
+import { BOSS } from '../data/chips.js';
 import { sound } from '../systems/sound.js';
 
 export const PumpkinMethods = {
@@ -13,7 +14,7 @@ export const PumpkinMethods = {
     const sprite = this.physics.add.sprite(bp.x, bp.y, 'boss');
     sprite.setData('fitMax', AUTOSCALE.pumpkin ?? FIT_MAX);
     sprite.setOrigin(0.5, 1); // viruses stand on their tiles too
-    this.placeFighter(sprite, col, row, BOSS_MANUAL);
+    this.placeFighter(sprite, col, row, BOSS.manualScale);
     const enemy = {
       type: 'pumpkin', sprite, col, row,
       hp: BOSS.maxHp, maxHp: BOSS.maxHp, alive: true,
@@ -81,7 +82,7 @@ export const PumpkinMethods = {
       const nc = Phaser.Math.Between(3, 5);
       const nr = Phaser.Math.Between(0, ROWS - 1);
       e.col = nc; e.row = nr;
-      this.teleportMove(e.sprite, nc, nr, BOSS_MANUAL);
+      this.teleportMove(e.sprite, nc, nr, BOSS.manualScale);
     }
 
     // telegraphed tile slam on the navi's tile

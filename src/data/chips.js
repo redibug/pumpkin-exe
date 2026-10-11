@@ -31,6 +31,7 @@ export const DECK = [
 export const BOSS = {
   name: 'PUMPKIN.EXE',
   maxHp: 600,
+  manualScale: 0.5,
   phases: [
     { threshold: 1.0, name: 'Sprout',  moveIntervalMs: 1400, attackIntervalMs: 2200 },
     { threshold: 0.6, name: 'Vine',    moveIntervalMs: 1000, attackIntervalMs: 1700 },
