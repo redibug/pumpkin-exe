@@ -227,6 +227,9 @@ export default class BattleScene extends Phaser.Scene {
           e.nextAttack = now + 2200;
         } else if (e.type === 'skitterbug') {
           e.nextCheck = now + 1500;
+        } else if (e.type === 'bombspider') {
+          e.nextMove = now; // move immediately, no grace period for moving
+          e.throwAllowedAt = now + BOMB_SPIDER.throwGraceMs;
         }
       }
       this.openCustom(); // MMBN-style: every battle starts at the custom screen

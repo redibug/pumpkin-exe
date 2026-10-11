@@ -30,6 +30,7 @@ export const BombSpiderMethods = {
       type: 'bombspider', sprite, bombBack, col, row,
       hp: BOMB_SPIDER.maxHp, maxHp: BOMB_SPIDER.maxHp, alive: true,
       nextMove: 0,
+      throwAllowedAt: 0, // set when battle starts (grace period)
       movesDone: 0, // cycle: move -> move -> throw -> repeat
       hasBomb: true, // false while the thrown bomb is in the air
       hpBar: this.makeHpBar(),
@@ -79,7 +80,7 @@ export const BombSpiderMethods = {
     // Cycle: move -> move -> throw -> repeat
     if (time >= e.nextMove) {
       e.nextMove = time + BOMB_SPIDER.moveIntervalMs;
-      if (e.movesDone >= BOMB_SPIDER.movesBeforeThrow) {
+      if (e.movesDone >= BOMB_SPIDER.movesBeforeThrow && time >= e.throwAllowedAt) {
         // time to throw (if carrying the bomb)
         if (e.hasBomb) {
           this.throwBomb(e);
