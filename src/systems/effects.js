@@ -191,6 +191,20 @@ export const EffectsMethods = {
     });
     tw._noPause = true;
   },
+  safeShake(duration = 120, intensity = 0.008) {
+    // Camera shake that guarantees the camera returns to normal.
+    // Overlapping shakes can leave the camera offset, causing a
+    // visual/logical position desync.
+    const cam = this.cameras.main;
+    cam.resetFX();
+    cam.shake(duration, intensity);
+    // Belt and suspenders: force reset after the shake should be done
+    this.time.delayedCall(duration + 50, () => {
+      if (cam.scrollX !== 0 || cam.scrollY !== 0) {
+        cam.resetFX();
+      }
+    });
+  },
   playSwordSlash(x, y, color = 0x4fc3f7, scale = 1) {
     // Crescent slash arc: draws in fast, fades out. Additive for glow.
     const g = this.add.graphics();
