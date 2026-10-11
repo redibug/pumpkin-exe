@@ -658,7 +658,7 @@ export default class BattleScene extends Phaser.Scene {
       if (curCol >= 0 && curCol !== b.getData('hlCol')) {
         const oldHl = b.getData('tileHighlight');
         if (oldHl && oldHl.active) oldHl.destroy();
-        const color = 0xce93d8; // match the wave color
+        const color = 0xff5252; // standard red telegraph (visible on pink tiles)
         const newHl = this.highlightTile(curCol, brow, color, 0.25);
         b.setData('tileHighlight', newHl);
         b.setData('hlCol', curCol);
