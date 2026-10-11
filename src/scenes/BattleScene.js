@@ -1863,7 +1863,7 @@ export default class BattleScene extends Phaser.Scene {
           },
         });
         this.tweens.add({
-          targets: md.screamText, y: sy - 70, alpha: 0,
+          targets: md.screamText, y: sy - 80, alpha: 0,
           duration: 1800*2, ease: 'Quad.easeOut',
           onComplete: () => {
             if (md.screamText) { md.screamText.destroy(); md.screamText = null; }
