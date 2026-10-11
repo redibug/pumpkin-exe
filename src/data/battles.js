@@ -17,8 +17,8 @@ export const BATTLES = [
       { speaker: 'bugchan', text: 'Squashed! Those beetles were slow!' },
     ],
     story: [
-      { speaker: 'mel', text: 'Good work. I see a turret guarding the next lane. Watch its row.' },
-      { speaker: 'bugchan', text: 'A turret? I will stay off its row!' },
+      { speaker: 'mel', text: 'Clean work. Two down, no damage.' },
+      { speaker: 'bugchan', text: 'I am the best debugger!' },
     ],
   },
   {
@@ -37,8 +37,8 @@ export const BATTLES = [
       { speaker: 'bugchan', text: 'Turret down! It never even moved!' },
     ],
     story: [
-      { speaker: 'mel', text: 'Nice dodging. Next up is a bomb spider. Do not stand still.' },
-      { speaker: 'bugchan', text: 'Bombs?! I will keep moving!' },
+      { speaker: 'mel', text: 'Nice footwork around that turret.' },
+      { speaker: 'bugchan', text: 'It could not hit what it could not catch!' },
     ],
   },
   {
@@ -55,8 +55,8 @@ export const BATTLES = [
       { speaker: 'bugchan', text: 'Defused! No more bombs!' },
     ],
     story: [
-      { speaker: 'mel', text: 'Good. Now I am picking up root signals. Something is digging.' },
-      { speaker: 'bugchan', text: 'Digging? Smells like dirt...' },
+      { speaker: 'mel', text: 'That bomb had your name on it. Good dodging.' },
+      { speaker: 'bugchan', text: 'Tick tock, no boom!' },
     ],
   },
   {
@@ -74,8 +74,8 @@ export const BATTLES = [
       { speaker: 'bugchan', text: 'Two down! That was easy!' },
     ],
     story: [
-      { speaker: 'mel', text: 'The plants are spreading. I see turrets tangled in vines ahead.' },
-      { speaker: 'bugchan', text: 'Plants and turrets? Weird combo!' },
+      { speaker: 'mel', text: 'Those screams are the worst. You handled it.' },
+      { speaker: 'bugchan', text: 'KYAAAH!! ...sorry, had to.' },
     ],
   },
   {
@@ -95,8 +95,8 @@ export const BATTLES = [
       { speaker: 'bugchan', text: 'Fast or not, they are squashed!' },
     ],
     story: [
-      { speaker: 'mel', text: 'The roots and bombs are nesting together now. Be careful.' },
-      { speaker: 'bugchan', text: 'Roots AND bombs? Double trouble!' },
+      { speaker: 'mel', text: 'Those green ones were fast. You kept up.' },
+      { speaker: 'bugchan', text: 'Speed is my middle name! Bugchan Speed Debug!' },
     ],
   },
   {
