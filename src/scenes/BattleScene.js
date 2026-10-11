@@ -82,6 +82,7 @@ export default class BattleScene extends Phaser.Scene {
     this.load.image('chip-bomb-small', 'assets/ui/chip-bomb-small.png');
     this.load.image('chip-frame', 'assets/ui/chip-frame.png');
     this.load.image('mug-bugchan', 'assets/mugshots/mug-bugchan.png');
+    this.load.image('mug-mel', 'assets/mugshots/mug-mel.png');
     this.load.image('mug-pumpkin', 'assets/mugshots/mug-pumpkin.png');
     this.load.image('mug-mandrake', 'assets/mugshots/mug-mandrake.png');
   }

@@ -11,7 +11,7 @@ import { sound } from './sound.js';
 
 export const CHARACTERS = {
   bugchan:  { name: 'Bugchan',       mugshot: 'mug-bugchan',  side: 'left',  color: '#ff9ecf' },
-  mel:      { name: 'Mel',           mugshot: null,           side: 'left',  color: '#e8f6ff' },
+  mel:      { name: 'Mel',           mugshot: 'mug-mel',      side: 'left',  color: '#e8f6ff' },
   pumpkin:  { name: 'PUMPKIN.EXE',   mugshot: 'mug-pumpkin',  side: 'right', color: '#ffb74d' },
   rootabreak: { name: 'ROOTABREAK',  mugshot: 'mug-mandrake', side: 'right', color: '#ce93d8' },
   skitterbug: { name: 'SKITTERBUG',  mugshot: null,           side: 'right', color: '#9dbb2e' },
