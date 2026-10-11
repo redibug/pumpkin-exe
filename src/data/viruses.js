@@ -5,7 +5,7 @@ export const SKITTER = {
   id: 'skitterbug',
   name: 'SKITTERBUG',
   maxHp: 60,
-  checkIntervalMs: 2800,  // slow cycle: each check is either a move or a spit
+  checkIntervalMs: 1400,  // slow cycle: each check is either a move or a spit
   bulletSpeed: 170,       // slow-moving ichor (chips fly at 520)
   bulletDamage: 10,
   bulletColor: 0x9dbb2e,  // sickly yellow-green ichor
@@ -16,7 +16,8 @@ export const SKITTER_GREEN = {
   ...SKITTER,
   id: 'skitterbug-green',
   name: 'SKITTERBUG-G',
-  checkIntervalMs: 1400,  // twice as fast as normal
+  checkIntervalMs: 700,  // twice as fast as normal
+  maxHp: 80,
 };
 
 export const SENTRY = {
