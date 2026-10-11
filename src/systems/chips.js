@@ -9,6 +9,7 @@ export const CHIPS = [
   { id: 'recover', name: 'Recover', damage: 0,  cooldownMs: 9000, color: 0x81c784, desc: 'Restores 60 HP to the navi.' },
   { id: 'railgun', name: 'Railgun', damage: 50, cooldownMs: 5000, color: 0x00e5ff, desc: 'Piercing hitscan blast down the entire row.' },
   { id: 'rapid',   name: 'Rapid Fire', damage: 8, shots: 10, fireIntervalMs: 130, cooldownMs: 0, color: 0xffeb3b, desc: 'Hold to fire 10 weak shots.' },
+  { id: 'bomb',    name: 'Bomb',    damage: 30, cooldownMs: 0, color: 0xff6f00, desc: 'Lobs a bomb 3 tiles ahead. Explodes in a plus shape.' },
 ];
 
 export const CHIP_MAP = Object.fromEntries(CHIPS.map((c) => [c.id, c]));
@@ -23,6 +24,7 @@ export const DECK = [
   'recover', 'recover', 'recover', 'recover',
   'railgun', 'railgun', 'railgun',
   'rapid', 'rapid', 'rapid',
+  'bomb', 'bomb', 'bomb',
 ];
 
 // Boss data — PUMPKIN.EXE. Phases keyed by HP thresholds.

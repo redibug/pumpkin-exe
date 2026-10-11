@@ -208,6 +208,7 @@ export default class BattleScene extends Phaser.Scene {
     this.load.image('sentry', 'assets/sprites/viruses/virus-sentry-clean.png');
     this.load.image('bomb-spider', 'assets/sprites/viruses/bomb spider.png');
     this.load.spritesheet('bomb', 'assets/sprites/viruses/bomb.png', { frameWidth: 64, frameHeight: 64 });
+    this.load.spritesheet('bug-bomb', 'assets/sprites/bug/bomb.png', { frameWidth: 64, frameHeight: 64 });
     this.load.image('bg', 'assets/tiles/bg-cyberspace.png');
     this.load.image('chip-cannon', 'assets/ui/chip-cannon.png');
     this.load.image('chip-sword', 'assets/ui/chip-sword.png');
@@ -215,12 +216,14 @@ export default class BattleScene extends Phaser.Scene {
     this.load.image('chip-recover', 'assets/ui/chip-recover.png');
     this.load.image('chip-railgun', 'assets/ui/chip-railgun.png');
     this.load.image('chip-rapid', 'assets/ui/chip-rapid.png');
+    this.load.image('chip-bomb', 'assets/ui/chip-bomb.png');
     this.load.image('chip-cannon-small', 'assets/ui/chip-cannon-small.png');
     this.load.image('chip-sword-small', 'assets/ui/chip-sword-small.png');
     this.load.image('chip-spread-small', 'assets/ui/chip-spread-small.png');
     this.load.image('chip-recover-small', 'assets/ui/chip-recover-small.png');
     this.load.image('chip-railgun-small', 'assets/ui/chip-railgun-small.png');
     this.load.image('chip-rapid-small', 'assets/ui/chip-rapid-small.png');
+    this.load.image('chip-bomb-small', 'assets/ui/chip-bomb-small.png');
     this.load.image('chip-frame', 'assets/ui/chip-frame.png');
     this.load.image('mug-bugchan', 'assets/mugshots/mug-bugchan.png');
     this.load.image('mug-pumpkin', 'assets/mugshots/mug-pumpkin.png');
@@ -274,6 +277,14 @@ export default class BattleScene extends Phaser.Scene {
       this.anims.create({
         key: 'bomb-fuse',
         frames: this.anims.generateFrameNumbers('bomb', { start: 0, end: 1 }),
+        frameRate: 8,
+        repeat: -1,
+      });
+    }
+    if (!this.anims.exists('bug-bomb-fuse')) {
+      this.anims.create({
+        key: 'bug-bomb-fuse',
+        frames: this.anims.generateFrameNumbers('bug-bomb', { start: 0, end: 1 }),
         frameRate: 8,
         repeat: -1,
       });
@@ -1603,6 +1614,63 @@ export default class BattleScene extends Phaser.Scene {
       // sword arc flash on the target tile
       const arc = this.highlightTile(target.col, target.row, chip.color, 0.35);
       this.time.delayedCall(140, () => arc.destroy());
+      return;
+    }
+
+    if (chip.id === 'bomb') {
+      // Lob a bomb 3 tiles ahead; explodes in a plus shape (like the spider's)
+      const targetCol = Math.min(COLS - 1, this.naviPos.col + 3);
+      const targetRow = this.naviPos.row;
+      // red warning telegraphs on the affected tiles
+      const warns = [];
+      const tiles = [[targetCol, targetRow],
+        [targetCol - 1, targetRow], [targetCol + 1, targetRow],
+        [targetCol, targetRow - 1], [targetCol, targetRow + 1]];
+      for (const [c, r] of tiles) {
+        if (c >= 0 && c < COLS && r >= 0 && r < ROWS) {
+          warns.push(this.highlightTile(c, r, 0xff3b30, 0.35));
+        }
+      }
+      const startX = feet.x + 30, startY = feet.y - 90;
+      const end = tileFeet(targetCol, targetRow);
+      const bomb = this.add.sprite(startX, startY, 'bug-bomb');
+      bomb.play('bug-bomb-fuse');
+      bomb.setScale(this.navi.scaleX * 0.9);
+      bomb.setDepth(20);
+      const proxy = { t: 0 };
+      const arcH = 190;
+      this.tweens.add({
+        targets: proxy, t: 1, duration: 1050, ease: 'Linear',
+        onUpdate: () => {
+          const t = proxy.t;
+          const x = startX + (end.x - startX) * t;
+          const y = startY + (end.y - startY) * t - Math.sin(t * Math.PI) * arcH;
+          bomb.setPosition(x, y);
+          bomb.angle += 5;
+        },
+        onComplete: () => {
+          bomb.destroy();
+          warns.forEach((w) => w.destroy());
+          // explosion flash
+          const c = tileCenter(targetCol, targetRow);
+          const boom = this.add.circle(c.x, c.y, 10, 0xff6f00).setDepth(20);
+          this.tweens.add({
+            targets: boom, scaleX: 4, scaleY: 2.5, alpha: 0,
+            duration: 280, ease: 'Quad.easeOut',
+            onComplete: () => boom.destroy(),
+          });
+          // damage enemies on the landing tile + orthogonal adjacent
+          for (const e of this.enemies) {
+            if (!e.alive) continue;
+            if (e.type === 'mandrake' && e.state !== 'emerged') continue;
+            const manhattan = Math.abs(e.col - targetCol) + Math.abs(e.row - targetRow);
+            if (manhattan <= 1) {
+              this.damageEnemy(e, chip.damage);
+              this.flash(e.sprite, chip.color);
+            }
+          }
+        },
+      });
       return;
     }
 
