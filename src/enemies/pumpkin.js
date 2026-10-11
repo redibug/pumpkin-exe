@@ -134,7 +134,7 @@ export const PumpkinMethods = {
             sound.explosion();
             this.playExplosion(tc.x, tc.y, tf.s * 0.8);
             // screen shake
-            this.safeShake(120, 0.008);
+            this.cameras.main.shake(120, 0.008);
             // hit if navi is still on the warned tile
             if (this.naviPos.col === target.col && this.naviPos.row === target.row) {
               this.damageNavi(20);

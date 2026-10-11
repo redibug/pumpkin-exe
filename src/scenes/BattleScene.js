@@ -707,7 +707,7 @@ export default class BattleScene extends Phaser.Scene {
     if (this.over) return;
     this.naviHp = Math.max(0, this.naviHp - amount);
     this.flash(this.navi, 0xff5252);
-    this.safeShake(120, 0.008);
+    this.cameras.main.shake(120, 0.008);
   }
 
   // ================= HUD + end =================
