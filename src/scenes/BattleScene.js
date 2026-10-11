@@ -664,6 +664,7 @@ export default class BattleScene extends Phaser.Scene {
       if (e.warnRect) { e.warnRect.destroy(); e.warnRect = null; }
       if (e.sprout) e.sprout.setVisible(false);
       if (e.sproutBob) e.sproutBob.stop();
+      if (e.breathTween) e.breathTween.stop();
       if (e.screamText) { e.screamText.destroy(); e.screamText = null; }
       if (e.wiggleTween) { e.wiggleTween.stop(); e.wiggleTween = null; }
       e.sprite.setAngle(0);

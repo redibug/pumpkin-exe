@@ -17,8 +17,26 @@ export const PumpkinMethods = {
       type: 'pumpkin', sprite, col, row,
       hp: BOSS.maxHp, maxHp: BOSS.maxHp, alive: true,
       nextMove: 0, nextAttack: 0,
+      nextTwitch: 0, // set on first AI tick
       hpBar: this.makeHpBar(),
     };
+    // Breathing: barely-there squash-and-stretch, pauses during teleport
+    enemy.breathBaseScaleX = sprite.scaleX;
+    enemy.breathBaseScaleY = sprite.scaleY;
+    enemy.breath = { v: 0 };
+    enemy.breathTween = this.tweens.add({
+      targets: enemy.breath, v: 1,
+      duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+      onUpdate: () => {
+        if (!enemy.alive) return;
+        if (enemy.sprite.getData('teleporting')) return;
+        const k = enemy.breath.v;
+        enemy.sprite.setScale(
+          enemy.breathBaseScaleX * (1 + 0.015 * k),
+          enemy.breathBaseScaleY * (1 - 0.02 * k)
+        );
+      },
+    });
     this.enemies.push(enemy);
     return enemy;
   },
@@ -30,6 +48,27 @@ export const PumpkinMethods = {
   },
   pumpkinAI(e, time) {
     const phase = this.bossPhase(e);
+
+    // rare unnerving twitch: sudden jerk with no easing, then still
+    if (!e.nextTwitch) e.nextTwitch = time + Phaser.Math.Between(3000, 6000);
+    if (time >= e.nextTwitch && !e.sprite.getData('teleporting')) {
+      e.nextTwitch = time + Phaser.Math.Between(5000, 10000);
+      // snap to a wrong angle, hold a beat, snap back
+      const jerk = Phaser.Math.Between(-5, 5) || 3;
+      this.tweens.add({
+        targets: e.sprite, angle: jerk,
+        duration: 60, ease: 'Quad.easeIn',
+        onComplete: () => {
+          this.time.delayedCall(120, () => {
+            if (!e.alive) return;
+            this.tweens.add({
+              targets: e.sprite, angle: 0,
+              duration: 90, ease: 'Quad.easeOut',
+            });
+          });
+        },
+      });
+    }
 
     // wander enemy columns
     if (time >= e.nextMove) {
