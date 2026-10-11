@@ -107,7 +107,7 @@ export const RootabreakMethods = {
         md.state = 'screaming';
         const sx = md.sprite.x, sy = md.sprite.y;
         const dh = md.sprite.displayHeight;
-        const textY = sy - 1.05 * dh; // just above the head
+        const textY = sy - 0.95 * dh; // at head height
         md.screamText = this.add.text(sx, textY, 'KYAAAH!!', {
           fontFamily: 'monospace', fontSize: '22px', color: '#ce93d8',
           stroke: '#2a0a2a', strokeThickness: 4,
