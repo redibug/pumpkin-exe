@@ -219,7 +219,13 @@ export const RootabreakMethods = {
     g.setData('damage', ROOTABREAK.screamDamage);
     g.setData('expand', 0); // tracks expansion for the update loop
     g.setData('baseScale', ps); // perspective scale (expansion multiplies this)
-    // tile indicator is managed in updateEnemyProjectiles (follows the wave)
+    // tile indicator is managed in updateEnemyProjectiles (follows the wave).
+    // Destroy hook attached here so the highlight always cleans up,
+    // even if the wave exits without changing tiles.
+    g.on('destroy', () => {
+      const h = g.getData('tileHighlight');
+      if (h && h.active) h.destroy();
+    });
     this.enemyProjectiles.add(g);
   }
 };
