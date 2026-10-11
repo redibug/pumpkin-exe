@@ -3,13 +3,13 @@
 // (cooldownMs is legacy data, unused now that chips don't recharge.)
 
 export const CHIPS = [
-  { id: 'cannon',  name: 'Cannon',  damage: 40, cooldownMs: 2500, color: 0xffa726, desc: 'Fires a straight shot down the row.' },
-  { id: 'sword',   name: 'Sword',   damage: 80, cooldownMs: 4000, color: 0x4fc3f7, desc: 'Slashes the tile directly ahead.' },
-  { id: 'spread',  name: 'Spread',  damage: 25, cooldownMs: 3500, color: 0xba68c8, desc: 'Hits the target row and the rows above/below.' },
+  { id: 'cannon',  name: 'Cannon',  damage: 60, cooldownMs: 2500, color: 0xffa726, desc: 'Fires a straight shot down the row.' },
+  { id: 'sword',   name: 'Sword',   damage: 100, cooldownMs: 4000, color: 0x4fc3f7, desc: 'Slashes the tile directly ahead.' },
+  { id: 'spread',  name: 'Spread',  damage: 30, cooldownMs: 3500, color: 0xba68c8, desc: 'Hits the target row and the rows above/below.' },
   { id: 'recover', name: 'Recover', damage: 0,  cooldownMs: 9000, color: 0x81c784, desc: 'Restores 60 HP to the navi.' },
-  { id: 'railgun', name: 'Railgun', damage: 50, cooldownMs: 5000, color: 0x00e5ff, desc: 'Piercing hitscan blast down the entire row.' },
+  { id: 'railgun', name: 'Railgun', damage: 40, cooldownMs: 5000, color: 0x00e5ff, desc: 'Piercing hitscan blast down the entire row.' },
   { id: 'rapid',   name: 'Rapid Fire', damage: 8, shots: 10, fireIntervalMs: 130, cooldownMs: 0, color: 0xffeb3b, desc: 'Hold to fire 10 weak shots.' },
-  { id: 'bomb',    name: 'Bomb',    damage: 30, cooldownMs: 0, color: 0xff6f00, desc: 'Lobs a bomb 3 tiles ahead. Explodes in a plus shape.' },
+  { id: 'bomb',    name: 'Bomb',    damage: 50, cooldownMs: 0, color: 0xff6f00, desc: 'Lobs a bomb 3 tiles ahead. Explodes in a plus shape.' },
 ];
 
 export const CHIP_MAP = Object.fromEntries(CHIPS.map((c) => [c.id, c]));
