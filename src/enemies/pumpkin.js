@@ -70,25 +70,43 @@ export const PumpkinMethods = {
     }
     e.lastPhase = phase;
 
-    // rare unnerving twitch: sudden jerk with no easing, then still
+    // unnerving twitch: gets more erratic as HP drops.
+    // Full HP: rare and subtle (±5°, every 5-10s).
+    // Low HP: frequent and violent (±15°, every 1-2s, sometimes double).
+    const hpFrac = e.hp / e.maxHp;
     if (!e.nextTwitch) e.nextTwitch = time + Phaser.Math.Between(3000, 6000);
     if (time >= e.nextTwitch && !e.sprite.getData('teleporting')) {
-      e.nextTwitch = time + Phaser.Math.Between(5000, 10000);
-      // snap to a wrong angle, hold a beat, snap back
-      const jerk = Phaser.Math.Between(-5, 5) || 3;
-      this.tweens.add({
-        targets: e.sprite, angle: jerk,
-        duration: 60, ease: 'Quad.easeIn',
-        onComplete: () => {
-          this.time.delayedCall(120, () => {
-            if (!e.alive) return;
-            this.tweens.add({
-              targets: e.sprite, angle: 0,
-              duration: 90, ease: 'Quad.easeOut',
+      // interval shrinks as HP drops: 10s -> 1s
+      const minInt = Phaser.Math.Linear(1000, 5000, hpFrac);
+      const maxInt = Phaser.Math.Linear(2000, 10000, hpFrac);
+      e.nextTwitch = time + Phaser.Math.Between(minInt, maxInt);
+      // angle grows as HP drops: ±5° -> ±15°
+      const maxJerk = Math.round(Phaser.Math.Linear(15, 5, hpFrac));
+      const jerk = Phaser.Math.Between(-maxJerk, maxJerk) || 3;
+      const doTwitch = (j) => {
+        this.tweens.add({
+          targets: e.sprite, angle: j,
+          duration: 60, ease: 'Quad.easeIn',
+          onComplete: () => {
+            this.time.delayedCall(120, () => {
+              if (!e.alive) return;
+              this.tweens.add({
+                targets: e.sprite, angle: 0,
+                duration: 90, ease: 'Quad.easeOut',
+              });
             });
-          });
-        },
-      });
+          },
+        });
+      };
+      doTwitch(jerk);
+      // below 25% HP: 40% chance of a second jerk right after
+      if (hpFrac < 0.25 && Math.random() < 0.4) {
+        this.time.delayedCall(250, () => {
+          if (!e.alive || e.sprite.getData('teleporting')) return;
+          const j2 = Phaser.Math.Between(-maxJerk, maxJerk) || -3;
+          doTwitch(j2);
+        });
+      }
     }
 
     // wander enemy columns
