@@ -499,11 +499,14 @@ export default class BattleScene extends Phaser.Scene {
     return enemy;
   }
 
-  // Position the back-bomb at the spider's abdomen, layered behind
+  // Position the back-bomb at the spider's abdomen, layered behind.
+  // Offset up and to the right so it peeks out from behind the body.
   positionBombBack(e) {
     const s = e.sprite;
-    // center of the bomb at ~55% up the spider's body (abdomen position)
-    e.bombBack.setPosition(s.x, s.y - s.displayHeight * 0.55);
+    e.bombBack.setPosition(
+      s.x + s.displayWidth * 0.28,
+      s.y - s.displayHeight * 0.72
+    );
     e.bombBack.setDepth(s.depth - 0.5); // behind the spider
   }
 
