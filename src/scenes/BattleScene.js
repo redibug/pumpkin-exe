@@ -91,6 +91,24 @@ const BATTLES = [
     ],
   },
   {
+    name: 'BOMB NEST',
+    enemies: [
+      { type: 'bombspider', col: 4, row: 1 },
+    ],
+    intro: [
+      { speaker: 'mel', text: 'A spider virus carrying a bomb. It throws it at you. Do not stand still.' },
+      { speaker: 'bugchan', text: 'A bomb?! Cute spider, bad idea!' },
+      { speaker: 'bombspider', text: 'TICK TOCK!' },
+    ],
+    victory: [
+      { speaker: 'bugchan', text: 'Defused! No more bombs!' },
+    ],
+    story: [
+      { speaker: 'mel', text: 'Good. The bombs are getting bigger ahead...' },
+      { speaker: 'bugchan', text: 'Bigger bombs? I am ready!' },
+    ],
+  },
+  {
     name: 'SPROUT PATROL',
     enemies: [
       { type: 'mandrake', col: 4, row: 0 },
@@ -272,6 +290,7 @@ export default class BattleScene extends Phaser.Scene {
       else if (e.type === 'mandrake') this.spawnMandrake(e.col, e.row, e.big);
       else if (e.type === 'skitterbug') this.spawnSkitterbug(e.col, e.row);
       else if (e.type === 'sentry') this.spawnSentry(e.col, e.row);
+      else if (e.type === 'bombspider') this.spawnBombSpider(e.col, e.row);
     }
     // NB: enemy AI timers are armed when the intro dialogue finishes, so
     // the battle doesn't run during the cutscene.

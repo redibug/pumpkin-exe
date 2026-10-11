@@ -15,6 +15,7 @@ export const CHARACTERS = {
   mandrake: { name: 'RUTABAGA.MND',  mugshot: 'mug-mandrake', side: 'right', color: '#ce93d8' },
   skitterbug: { name: 'SKITTERBUG',  mugshot: null,           side: 'right', color: '#9dbb2e' },
   sentry:   { name: 'SENTRY',        mugshot: null,           side: 'right', color: '#ff3b30' },
+  bombspider: { name: 'BOMB SPIDER',  mugshot: null,           side: 'right', color: '#ff6f00' },
 };
 
 const CPS = 48; // teletype characters per second
