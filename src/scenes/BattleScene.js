@@ -724,6 +724,14 @@ export default class BattleScene extends Phaser.Scene {
     if (this.naviHp <= 0) {
       // Bugchan gets the delete animation too
       this.tweens.killTweensOf(this.navi);
+      // abort mid-teleport: clear the flag (tick sees it and cleans up),
+      // destroy any strip objects — otherwise the 'in' phase re-shows her
+      if (this.navi.getData('teleporting')) {
+        this.navi.setData('teleporting', false);
+        const objs = this.navi.getData('teleportObjs') || [];
+        objs.forEach((o) => { if (o.active) o.destroy(); });
+        this.navi.setData('teleportObjs', null);
+      }
       this.dissolveSprite(this.navi);
       this.startDialogue(SCRIPTS.defeat, () => this.showGameOver());
       return;
