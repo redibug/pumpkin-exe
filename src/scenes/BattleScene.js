@@ -399,12 +399,9 @@ export default class BattleScene extends Phaser.Scene {
     sprout.setScale(mp.s * 0.9).setDepth(9 + row);
     const sprite = this.physics.add.sprite(mp.x, mp.y, 'rootabreak').setVisible(false);
     sprite.setData('fitMax', AUTOSCALE.rootabreak ?? FIT_MAX);
-    sprite.setOrigin(0.5, 0.9); // grounded origin
+    sprite.setOrigin(0.5, 1); // standard grounded origin
     if (big) sprite.setTint(0xffab91); // big one: slightly red tint
     this.placeFighter(sprite, col, row, MANDRAKE_MANUAL * (big ? 1.35 : 1));
-    // compensate for (0.5, 0.9): placeFighter assumes (0.5, 1), so shift up
-    // by 10% of height to keep the bottom at the feet line
-    sprite.y -= 0.1 * sprite.displayHeight;
     // store the home position for the leap (sprite returns here)
     const homeY = sprite.y;
     const maxHp = big ? M.maxHp * 2 : M.maxHp;
@@ -1815,18 +1812,12 @@ export default class BattleScene extends Phaser.Scene {
     }
     if (md.state !== 'planted' || time < md.nextJump) return;
 
-    // LEAP: hide sprout, show sprite, switch to air origin (0.5, 0.5)
+    // LEAP: hide sprout, show sprite
     md.state = 'leaping';
     md.sprout.setVisible(false);
     md.sprite.setVisible(true);
     const manual = MANDRAKE_MANUAL * (md.big ? 1.35 : 1);
     this.placeFighter(md.sprite, md.col, md.row, manual);
-    // compensate for (0.5, 0.9) ground origin first
-    md.sprite.y -= 0.1 * md.sprite.displayHeight;
-    // switch origin to center for the air; compensate y so it doesn't shift
-    const dh = md.sprite.displayHeight;
-    md.sprite.setOrigin(0.5, 0.5);
-    md.sprite.y -= (0.9 - 0.5) * dh;
     const airHomeY = md.sprite.y;
     // pop-in scale
     const targetScale = md.sprite.scaleX;
@@ -1871,9 +1862,7 @@ export default class BattleScene extends Phaser.Scene {
             duration: M.leapMs, ease: 'Quad.easeIn',
             onComplete: () => {
               if (!md.alive) return;
-              // LAND: back to ground origin (0.5, 0.9), re-plant
-              md.sprite.setOrigin(0.5, 0.9);
-              md.sprite.y = md.homeY;
+              // LAND: re-plant
               md.state = 'planted';
               md.sprite.setVisible(false);
               md.sprout.setVisible(true);
