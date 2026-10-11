@@ -20,6 +20,7 @@ export const PumpkinMethods = {
       hp: BOSS.maxHp, maxHp: BOSS.maxHp, alive: true,
       nextMove: 0, nextAttack: 0,
       nextTwitch: 0, // set on first AI tick
+      nextSentrySummon: 0,
       lastPhase: null,
       hpBar: this.makeHpBar(),
     };
@@ -142,6 +143,16 @@ export const PumpkinMethods = {
           },
         });
       });
+    }
+
+    // HARVEST ONLY: if on the navi's row, summon a disposable sentry
+    // in the back row, already winding up to fire
+    if (phase === BOSS.phases[2] && e.row === this.naviPos.row && time >= e.nextSentrySummon) {
+      e.nextSentrySummon = time + 4000;
+      const sentry = this.spawnSentry(5, e.row);
+      sentry.summoned = true; // deletes itself after firing
+      sentry.hpBar.setVisible(false); // it's an attack, not an enemy
+      sound.teleport();
     }
   }
 };
