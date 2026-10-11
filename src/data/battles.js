@@ -103,7 +103,6 @@ export const BATTLES = [
     name: 'PUMPKIN.EXE',
     enemies: [
       { type: 'pumpkin', col: 4, row: 1 },
-      { type: 'rootabreak', col: 5, row: 0 },
     ],
     intro: [
       { speaker: 'mel', text: 'Bugchan, I jacked you into the cyberworld. Something is wrong in there...' },
