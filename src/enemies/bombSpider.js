@@ -79,7 +79,7 @@ export const BombSpiderMethods = {
     // Cycle: move -> move -> throw -> repeat
     if (time >= e.nextMove) {
       e.nextMove = time + BOMB_SPIDER.moveIntervalMs;
-      if (e.movesDone >= 3) {
+      if (e.movesDone >= BOMB_SPIDER.movesBeforeThrow) {
         // time to throw (if carrying the bomb)
         if (e.hasBomb) {
           this.throwBomb(e);
