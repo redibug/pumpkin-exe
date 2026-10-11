@@ -24,6 +24,10 @@ export default class TitleScene extends Phaser.Scene {
     };
     this.input.once('pointerdown', startMus);
     this.input.keyboard.once('keydown', startMus);
+    // also catch clicks anywhere on the page (outside the canvas)
+    const pageClick = () => { startMus(); document.removeEventListener('pointerdown', pageClick); };
+    document.addEventListener('pointerdown', pageClick);
+    this.events.once('shutdown', () => document.removeEventListener('pointerdown', pageClick));
     const { width, height } = this.scale;
     const cx = width / 2;
 
