@@ -67,9 +67,9 @@ export const BATTLES = [
       { type: 'rootabreak', col: 5, row: 1 },
     ],
     intro: [
-      { speaker: 'mel', text: 'Two rootabreak viruses. They hide underground, then jump out screaming.' },
-      { speaker: 'bugchan', text: 'Are these turnips?' },
+      { speaker: 'bugchan', text: 'Where is the virus? I only see turnips.' },
       { speaker: 'mel', text: 'Actually, I think they are rutabagas.' },
+      { speaker: 'mel', text: 'They hide underground, then jump out screaming.' },
       { speaker: 'bugchan', text: 'Rutabagas?! I will debug these roots!' },
       { speaker: 'rootabreak', text: 'KYAAAH!!' },
     ],
